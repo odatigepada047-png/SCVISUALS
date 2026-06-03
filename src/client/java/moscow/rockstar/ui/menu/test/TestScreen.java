@@ -62,6 +62,9 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
     private boolean searchFocused = false;
     private final Map<moscow.rockstar.systems.setting.Setting, Boolean> expandedSettings = new HashMap<>();
     private Module bindingModule = null;
+    private moscow.rockstar.systems.setting.settings.BindSetting bindingSetting = null;
+    private final Map<moscow.rockstar.systems.setting.Setting, Animation> settingAnimations = new HashMap<>();
+    private final Map<Module, Animation> toggleAnimations = new HashMap<>();
 
     // Draggable Slider context
     private moscow.rockstar.systems.setting.settings.SliderSetting draggingSlider = null;
@@ -99,6 +102,7 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
         this.colorPickers.clear();
         this.expandedSettings.clear();
         this.bindingModule = null;
+        this.bindingSetting = null;
         this.draggingSlider = null;
         super.init();
     }
@@ -200,38 +204,95 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
         this.colorPickers.removeIf(colorPicker -> colorPicker.getAnimation().getValue() == 0.0f && !colorPicker.isShowing());
     }
 
+    private void drawFolderIcon(UIContext context, float x, float y, float size, ColorRGBA color) {
+        float bodyW = size;
+        float bodyH = size * 0.7f;
+        float bodyY = y + size * 0.3f;
+        // Draw back tab
+        context.drawRoundedRect(x + 1.0f, y + 1.0f, size * 0.45f, size * 0.3f, BorderRadius.all(1.0f), color);
+        // Draw main body
+        context.drawRoundedRect(x, bodyY, bodyW, bodyH, BorderRadius.all(1.5f), color);
+    }
+
+    private void drawPaintbrushIcon(UIContext context, float x, float y, float size, ColorRGBA color) {
+        float bandW = size * 0.4f;
+        float bandH = size * 0.2f;
+        float bandX = x + (size - bandW) / 2.0f;
+        float bandY = y + size * 0.4f;
+        
+        // bristles
+        context.drawRoundedRect(bandX, bandY + bandH, bandW, size * 0.4f, BorderRadius.all(1.0f), color);
+        // metal band
+        context.drawRoundedRect(bandX - 0.5f, bandY, bandW + 1.0f, bandH, BorderRadius.all(0.5f), color.withAlpha(color.getAlpha() * 0.7f));
+        // handle
+        context.drawRoundedRect(x + (size - size * 0.15f) / 2.0f, y + 1.0f, size * 0.15f, size * 0.4f, BorderRadius.all(1.0f), color.withAlpha(color.getAlpha() * 0.5f));
+    }
+
+    private void drawBindButton(UIContext context, float x, float y, float width, float height, String text, boolean hovered, float alpha) {
+        boolean dark = Rockstar.getInstance().getThemeManager().getCurrentTheme() == Theme.DARK;
+        ColorRGBA bg = dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha);
+        ColorRGBA border = dark ? new ColorRGBA(36.0f, 46.0f, 62.0f, 255.0f * alpha) : new ColorRGBA(190.0f, 190.0f, 195.0f, 255.0f * alpha);
+        
+        context.drawRoundedRect(x, y, width, height, BorderRadius.all(3.0f), bg);
+        context.drawRoundedBorder(x, y, width, height, 0.5f, BorderRadius.all(3.0f), hovered ? Colors.getAccentColor().withAlpha(alpha * 255.0f) : border);
+        
+        String fullText = "⌨ " + text;
+        float textY = y + (height - Fonts.REGULAR.getFont(6.0f).height()) / 2.0f - 0.5f;
+        context.drawCenteredText(Fonts.REGULAR.getFont(6.0f), fullText, x + width / 2.0f, textY, (hovered ? Colors.getAccentColor() : Colors.getTextColor()).withAlpha(alpha * 255.0f));
+    }
+
     private void renderTopBar(UIContext context, float alpha) {
         float x = this.menuWindow.x;
         float y = this.menuWindow.y;
         float width = this.menuWindow.getWidth();
+        boolean dark = Rockstar.getInstance().getThemeManager().getCurrentTheme() == Theme.DARK;
 
         // 1. Draw Void/Icon Logo on left
         context.drawRoundedRect(x + 12.0f, y + 8.0f, 12.0f, 12.0f, BorderRadius.all(3.0f), Colors.getAccentColor().withAlpha(alpha * 255.0f));
         context.drawCenteredText(Fonts.BOLD.getFont(8.0f), "V", x + 18.0f, y + 10.5f, ColorRGBA.WHITE.withAlpha(alpha * 255.0f));
 
         // 2. Draw Navigation Tabs Center
-        String[] tabs = new String[]{"Combat", "Movement", "Player", "Visuals", "Misc", "Configs", "Themes"};
-        float tabsStartX = x + width / 2.0f - 150.0f;
-        for (int i = 0; i < tabs.length; i++) {
-            float tabX = tabsStartX + i * 40.0f;
-            float tabWidth = 36.0f;
-            boolean hovered = GuiUtility.isHovered(tabX, y + 4.0f, tabWidth, 20.0f, context);
+        float navBarWidth = 180.0f;
+        float navBarHeight = 18.0f;
+        float navBarX = x + (width - navBarWidth) / 2.0f;
+        float navBarY = y + 6.0f;
+
+        ColorRGBA navBg = dark ? new ColorRGBA(16.0f, 21.0f, 30.0f, 255.0f * alpha * 0.8f) : new ColorRGBA(225.0f, 225.0f, 230.0f, 255.0f * alpha * 0.8f);
+        ColorRGBA navBorder = dark ? new ColorRGBA(28.0f, 35.0f, 48.0f, 255.0f * alpha * 0.8f) : new ColorRGBA(200.0f, 200.0f, 205.0f, 255.0f * alpha * 0.8f);
+
+        context.drawRoundedRect(navBarX, navBarY, navBarWidth, navBarHeight, BorderRadius.all(5.0f), navBg);
+        context.drawRoundedBorder(navBarX, navBarY, navBarWidth, navBarHeight, 0.5f, BorderRadius.all(5.0f), navBorder);
+
+        float step = navBarWidth / 7.0f;
+        for (int i = 0; i < 7; i++) {
+            float tabX = navBarX + i * step;
+            boolean hovered = GuiUtility.isHovered(tabX, navBarY, step, navBarHeight, context);
             boolean selected = (i == this.activeTab);
 
-            ColorRGBA textColor = selected ? Colors.getAccentColor() : (hovered ? Colors.getTextColor() : Colors.getTextColor().withAlpha(120.0f));
-            if (i == 6) {
-                // paint brush icon for themes
-                context.drawCenteredText(Fonts.MEDIUM.getFont(7.0f), "🎨", tabX + tabWidth / 2.0f, y + 10.0f, textColor.withAlpha(alpha * 255.0f));
+            ColorRGBA iconColor = selected ? Colors.getAccentColor() : (hovered ? Colors.getTextColor() : Colors.getTextColor().withAlpha(120.0f));
+            float iconSize = 10.0f;
+            float iconX = tabX + (step - iconSize) / 2.0f;
+            float iconY = navBarY + (navBarHeight - iconSize) / 2.0f;
+
+            if (i == 0) {
+                context.drawSprite(moscow.rockstar.utility.render.obj.CustomSprite.COMBAT, iconX, iconY, iconSize, iconSize, iconColor.withAlpha(alpha * 255.0f));
+            } else if (i == 1) {
+                context.drawSprite(moscow.rockstar.utility.render.obj.CustomSprite.MOVEMENT, iconX, iconY, iconSize, iconSize, iconColor.withAlpha(alpha * 255.0f));
+            } else if (i == 2) {
+                context.drawSprite(moscow.rockstar.utility.render.obj.CustomSprite.PLAYER, iconX, iconY, iconSize, iconSize, iconColor.withAlpha(alpha * 255.0f));
+            } else if (i == 3) {
+                context.drawSprite(moscow.rockstar.utility.render.obj.CustomSprite.VISUALS, iconX, iconY, iconSize, iconSize, iconColor.withAlpha(alpha * 255.0f));
+            } else if (i == 4) {
+                context.drawSprite(moscow.rockstar.utility.render.obj.CustomSprite.OTHER, iconX, iconY, iconSize, iconSize, iconColor.withAlpha(alpha * 255.0f));
             } else if (i == 5) {
-                // configs icon
-                context.drawCenteredText(Fonts.MEDIUM.getFont(7.0f), "📁", tabX + tabWidth / 2.0f, y + 10.0f, textColor.withAlpha(alpha * 255.0f));
+                this.drawFolderIcon(context, iconX, iconY, iconSize, iconColor.withAlpha(alpha * 255.0f));
             } else {
-                context.drawCenteredText(Fonts.MEDIUM.getFont(7.0f), tabs[i], tabX + tabWidth / 2.0f, y + 10.0f, textColor.withAlpha(alpha * 255.0f));
+                this.drawPaintbrushIcon(context, iconX, iconY, iconSize, iconColor.withAlpha(alpha * 255.0f));
             }
 
-            // Draw line under active tab
             if (selected) {
-                context.drawRect(tabX + 4.0f, y + 22.0f, tabWidth - 8.0f, 1.5f, Colors.getAccentColor().withAlpha(alpha * 255.0f));
+                float lineW = 8.0f;
+                context.drawRect(tabX + (step - lineW) / 2.0f, navBarY + navBarHeight - 1.5f, lineW, 1.0f, Colors.getAccentColor().withAlpha(alpha * 255.0f));
             }
 
             if (hovered) {
@@ -342,23 +403,19 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.SliderSetting) {
                     height += 22.0f;
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.SelectSetting) {
-                    boolean expanded = this.expandedSettings.getOrDefault(setting, false);
-                    if (expanded) {
-                        moscow.rockstar.systems.setting.settings.SelectSetting ss = (moscow.rockstar.systems.setting.settings.SelectSetting) setting;
-                        height += 16.0f + ss.getValues().size() * 12.0f + 4.0f;
-                    } else {
-                        height += 16.0f;
-                    }
+                    moscow.rockstar.systems.setting.settings.SelectSetting ss = (moscow.rockstar.systems.setting.settings.SelectSetting) setting;
+                    Animation anim = this.settingAnimations.computeIfAbsent(ss, s -> new Animation(200L, Easing.BAKEK));
+                    float progress = anim.getRGB();
+                    height += 25.0f + progress * (ss.getValues().size() * 12.0f + 4.0f);
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.ModeSetting) {
-                    boolean expanded = this.expandedSettings.getOrDefault(setting, false);
-                    if (expanded) {
-                        moscow.rockstar.systems.setting.settings.ModeSetting ms = (moscow.rockstar.systems.setting.settings.ModeSetting) setting;
-                        height += 16.0f + ms.getValues().size() * 12.0f + 4.0f;
-                    } else {
-                        height += 16.0f;
-                    }
+                    moscow.rockstar.systems.setting.settings.ModeSetting ms = (moscow.rockstar.systems.setting.settings.ModeSetting) setting;
+                    Animation anim = this.settingAnimations.computeIfAbsent(ms, s -> new Animation(200L, Easing.BAKEK));
+                    float progress = anim.getRGB();
+                    height += 25.0f + progress * (ms.getValues().size() * 12.0f + 4.0f);
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.ColorSetting) {
                     height += 15.0f;
+                } else if (setting instanceof moscow.rockstar.systems.setting.settings.BindSetting) {
+                    height += 16.0f;
                 } else {
                     height += 14.0f;
                 }
@@ -385,24 +442,31 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
         float actionsX = x + width - padding;
 
         // 1. Toggle switch on far right
-        actionsX -= 12.0f;
-        boolean toggleHovered = GuiUtility.isHovered(actionsX, headerY, 12.0f, 10.0f, context);
-        ColorRGBA toggleColor = module.isEnabled() ? Colors.getAccentColor() : Colors.getTextColor().withAlpha(80.0f);
-        context.drawRoundedRect(actionsX, headerY + 1.0f, 12.0f, 6.0f, BorderRadius.all(3.0f), toggleColor);
-        context.drawRoundedRect(actionsX + (module.isEnabled() ? 6.0f : 1.0f), headerY + 2.0f, 4.0f, 4.0f, BorderRadius.all(2.0f), ColorRGBA.WHITE.withAlpha(255.0f * alpha));
+        actionsX -= 18.0f;
+        boolean toggleHovered = GuiUtility.isHovered(actionsX, headerY - 1.0f, 18.0f, 10.0f, context);
+        Animation toggleAnim = this.toggleAnimations.computeIfAbsent(module, m -> new Animation(150L, Easing.BAKEK));
+        toggleAnim.update(module.isEnabled() ? 1.0f : 0.0f);
+        float toggleVal = toggleAnim.getRGB();
+        ColorRGBA trackColor = Colors.getTextColor().withAlpha(60.0f).mix(Colors.getAccentColor(), toggleVal);
+        
+        context.drawRoundedRect(actionsX, headerY - 1.0f, 18.0f, 10.0f, BorderRadius.all(5.0f), trackColor.withAlpha(trackColor.getAlpha() * alpha));
+        context.drawRoundedRect(actionsX + 1.0f + toggleVal * 8.0f, headerY, 8.0f, 8.0f, BorderRadius.all(4.0f), ColorRGBA.WHITE.withAlpha(255.0f * alpha));
         if (toggleHovered) CursorUtility.set(CursorType.HAND);
-        actionsX -= 6.0f;
 
         // 2. Bind button
         int key = module.getKey();
         String bindText = (this.bindingModule == module) ? "..." : (key == -1 ? "None" : TextUtility.getKeyName(key));
-        float bindTextWidth = Fonts.REGULAR.getFont(5.5f).width(bindText) + 6.0f;
-        actionsX -= bindTextWidth;
-        boolean bindHovered = GuiUtility.isHovered(actionsX, headerY - 1.0f, bindTextWidth, 10.0f, context);
-        context.drawRoundedRect(actionsX, headerY - 1.0f, bindTextWidth, 10.0f, BorderRadius.all(2.0f), dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha));
-        context.drawCenteredText(Fonts.REGULAR.getFont(5.5f), bindText, actionsX + bindTextWidth / 2.0f, headerY + 1.0f, (bindHovered ? Colors.getAccentColor() : Colors.getTextColor().withAlpha(180.0f)).withAlpha(alpha * 255.0f));
+        float bindTextWidth = Fonts.REGULAR.getFont(5.5f).width(bindText) + 10.0f;
+        actionsX -= (bindTextWidth + 4.0f);
+        boolean bindHovered = GuiUtility.isHovered(actionsX, headerY - 2.0f, bindTextWidth, 12.0f, context);
+        ColorRGBA btnBg = dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha);
+        ColorRGBA btnBorder = dark ? new ColorRGBA(36.0f, 46.0f, 62.0f, 255.0f * alpha) : new ColorRGBA(190.0f, 190.0f, 195.0f, 255.0f * alpha);
+        context.drawRoundedRect(actionsX, headerY - 2.0f, bindTextWidth, 12.0f, BorderRadius.all(3.0f), btnBg);
+        context.drawRoundedBorder(actionsX, headerY - 2.0f, bindTextWidth, 12.0f, 0.5f, BorderRadius.all(3.0f), bindHovered ? Colors.getAccentColor().withAlpha(alpha * 255.0f) : btnBorder);
+        float bindTextY = (headerY - 2.0f) + (12.0f - Fonts.REGULAR.getFont(5.5f).height()) / 2.0f - 0.5f;
+        context.drawCenteredText(Fonts.REGULAR.getFont(5.5f), bindText, actionsX + bindTextWidth / 2.0f, bindTextY, (bindHovered ? Colors.getAccentColor() : Colors.getTextColor().withAlpha(180.0f)).withAlpha(alpha * 255.0f));
         if (bindHovered) CursorUtility.set(CursorType.HAND);
-        actionsX -= 6.0f;
+        actionsX -= 4.0f;
 
         // 3. Star favorite icon
         actionsX -= 10.0f;
@@ -478,79 +542,118 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.SelectSetting) {
                     moscow.rockstar.systems.setting.settings.SelectSetting ss = (moscow.rockstar.systems.setting.settings.SelectSetting) setting;
                     boolean expanded = this.expandedSettings.getOrDefault(ss, false);
+                    Animation anim = this.settingAnimations.computeIfAbsent(ss, s -> new Animation(200L, Easing.BAKEK));
+                    anim.update(expanded ? 1.0f : 0.0f);
+                    float progress = anim.getRGB();
 
-                    // Draw select header box
-                    boolean headerHovered = GuiUtility.isHovered(x + padding, currentY, width - padding * 2, 12.0f, context);
-                    context.drawRoundedRect(x + padding, currentY + 1.0f, width - padding * 2, 11.0f, BorderRadius.all(2.0f), dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha));
+                    boolean headerHovered = GuiUtility.isHovered(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, context);
+                    
+                    // Name on top
+                    context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(ss.getName()), x + padding, currentY + 1.0f, Colors.getTextColor().withAlpha(160.0f * alpha));
 
-                    context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(ss.getName()), x + padding + 4.0f, currentY + 3.5f, Colors.getTextColor().withAlpha(160.0f * alpha));
+                    // Box under
+                    context.drawRoundedRect(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, BorderRadius.all(3.0f), dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha));
+                    context.drawRoundedBorder(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, 0.5f, BorderRadius.all(3.0f), outlineColor);
+
+                    // Bullet tag
+                    context.drawRoundedRect(x + padding + 5.0f, currentY + 14.5f, 4.0f, 4.0f, BorderRadius.all(2.0f), Colors.getAccentColor().withAlpha(alpha * 255.0f));
 
                     // Selected values list string
-                    String selectedStr = ss.getSelectedValues().isEmpty() ? "None" : ss.getSelectedValues().get(0).getName();
+                    String selectedStr = ss.getSelectedValues().isEmpty() ? "None" : Localizator.translate(ss.getSelectedValues().get(0).getName());
                     if (ss.getSelectedValues().size() > 1) {
                         selectedStr += " +" + (ss.getSelectedValues().size() - 1);
                     }
-                    context.drawRightText(Fonts.REGULAR.getFont(6.0f), selectedStr, x + width - padding - 12.0f, currentY + 3.5f, Colors.getAccentColor().withAlpha(alpha * 255.0f));
+                    context.drawText(Fonts.REGULAR.getFont(6.0f), selectedStr, x + padding + 13.0f, currentY + 13.5f, Colors.getTextColor().withAlpha(alpha * 220.0f));
 
                     // Dropdown arrow icon
-                    context.drawText(Fonts.REGULAR.getFont(6.0f), expanded ? "▲" : "▼", x + width - padding - 8.0f, currentY + 3.0f, Colors.getTextColor().withAlpha(120.0f * alpha));
+                    context.drawText(Fonts.REGULAR.getFont(5.5f), expanded ? "▲" : "▼", x + width - padding - 10.0f, currentY + 13.5f, Colors.getTextColor().withAlpha(120.0f * alpha));
 
                     if (headerHovered) CursorUtility.set(CursorType.HAND);
 
-                    currentY += 16.0f;
-
-                    // If expanded, draw settings choices
-                    if (expanded) {
-                        float choicesY = currentY;
+                    float choicesH = ss.getValues().size() * 12.0f + 4.0f;
+                    if (progress > 0.0f) {
+                        ScissorUtility.push(context.pose(), x + padding, currentY + 24.0f, width - padding * 2, progress * choicesH);
+                        float choicesY = currentY + 24.0f;
                         for (moscow.rockstar.systems.setting.settings.SelectSetting.Value value : ss.getValues()) {
                             boolean itemHovered = GuiUtility.isHovered(x + padding, choicesY, width - padding * 2, 11.0f, context);
                             if (value.isSelected()) {
                                 context.drawRoundedRect(x + padding + 2.0f, choicesY + 1.0f, width - padding * 2 - 4.0f, 9.0f, BorderRadius.all(1.5f), Colors.getAccentColor().withAlpha(60.0f * alpha));
                             }
-                            context.drawText(Fonts.REGULAR.getFont(6.0f), value.getName(), x + padding + 6.0f, choicesY + 2.5f, Colors.getTextColor().withAlpha((itemHovered || value.isSelected() ? 255.0f : 140.0f) * alpha));
+                            context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(value.getName()), x + padding + 13.0f, choicesY + 2.5f, Colors.getTextColor().withAlpha((itemHovered || value.isSelected() ? 255.0f : 140.0f) * alpha));
 
                             if (itemHovered) CursorUtility.set(CursorType.HAND);
                             choicesY += 12.0f;
                         }
-                        currentY += ss.getValues().size() * 12.0f + 4.0f;
+                        ScissorUtility.pop();
                     }
+                    currentY += 25.0f + progress * choicesH;
 
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.ModeSetting) {
                     moscow.rockstar.systems.setting.settings.ModeSetting ms = (moscow.rockstar.systems.setting.settings.ModeSetting) setting;
                     boolean expanded = this.expandedSettings.getOrDefault(ms, false);
+                    Animation anim = this.settingAnimations.computeIfAbsent(ms, s -> new Animation(200L, Easing.BAKEK));
+                    anim.update(expanded ? 1.0f : 0.0f);
+                    float progress = anim.getRGB();
 
-                    // Draw mode header box
-                    boolean headerHovered = GuiUtility.isHovered(x + padding, currentY, width - padding * 2, 12.0f, context);
-                    context.drawRoundedRect(x + padding, currentY + 1.0f, width - padding * 2, 11.0f, BorderRadius.all(2.0f), dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha));
+                    boolean headerHovered = GuiUtility.isHovered(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, context);
+                    
+                    // Name on top
+                    context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(ms.getName()), x + padding, currentY + 1.0f, Colors.getTextColor().withAlpha(160.0f * alpha));
 
-                    context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(ms.getName()), x + padding + 4.0f, currentY + 3.5f, Colors.getTextColor().withAlpha(160.0f * alpha));
+                    // Box under
+                    context.drawRoundedRect(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, BorderRadius.all(3.0f), dark ? new ColorRGBA(24.0f, 32.0f, 46.0f, 255.0f * alpha) : new ColorRGBA(210.0f, 210.0f, 215.0f, 255.0f * alpha));
+                    context.drawRoundedBorder(x + padding, currentY + 10.0f, width - padding * 2, 13.0f, 0.5f, BorderRadius.all(3.0f), outlineColor);
+
+                    // Bullet tag
+                    context.drawRoundedRect(x + padding + 5.0f, currentY + 14.5f, 4.0f, 4.0f, BorderRadius.all(2.0f), Colors.getAccentColor().withAlpha(alpha * 255.0f));
 
                     // Current chosen mode value
-                    String activeModeName = ms.getValue() != null ? ms.getValue().getName() : "None";
-                    context.drawRightText(Fonts.REGULAR.getFont(6.0f), activeModeName, x + width - padding - 12.0f, currentY + 3.5f, Colors.getAccentColor().withAlpha(alpha * 255.0f));
+                    String activeModeName = ms.getValue() != null ? Localizator.translate(ms.getValue().getName()) : "None";
+                    context.drawText(Fonts.REGULAR.getFont(6.0f), activeModeName, x + padding + 13.0f, currentY + 13.5f, Colors.getTextColor().withAlpha(alpha * 220.0f));
 
                     // Dropdown arrow icon
-                    context.drawText(Fonts.REGULAR.getFont(6.0f), expanded ? "▲" : "▼", x + width - padding - 8.0f, currentY + 3.0f, Colors.getTextColor().withAlpha(120.0f * alpha));
+                    context.drawText(Fonts.REGULAR.getFont(5.5f), expanded ? "▲" : "▼", x + width - padding - 10.0f, currentY + 13.5f, Colors.getTextColor().withAlpha(120.0f * alpha));
 
                     if (headerHovered) CursorUtility.set(CursorType.HAND);
 
-                    currentY += 16.0f;
-
-                    // If expanded, draw choices
-                    if (expanded) {
-                        float choicesY = currentY;
+                    float choicesH = ms.getValues().size() * 12.0f + 4.0f;
+                    if (progress > 0.0f) {
+                        ScissorUtility.push(context.pose(), x + padding, currentY + 24.0f, width - padding * 2, progress * choicesH);
+                        float choicesY = currentY + 24.0f;
                         for (moscow.rockstar.systems.setting.settings.ModeSetting.Value value : ms.getValues()) {
                             boolean itemHovered = GuiUtility.isHovered(x + padding, choicesY, width - padding * 2, 11.0f, context);
                             if (value.isSelected()) {
                                 context.drawRoundedRect(x + padding + 2.0f, choicesY + 1.0f, width - padding * 2 - 4.0f, 9.0f, BorderRadius.all(1.5f), Colors.getAccentColor().withAlpha(60.0f * alpha));
                             }
-                            context.drawText(Fonts.REGULAR.getFont(6.0f), value.getName(), x + padding + 6.0f, choicesY + 2.5f, Colors.getTextColor().withAlpha((itemHovered || value.isSelected() ? 255.0f : 140.0f) * alpha));
+                            context.drawText(Fonts.REGULAR.getFont(6.0f), Localizator.translate(value.getName()), x + padding + 13.0f, choicesY + 2.5f, Colors.getTextColor().withAlpha((itemHovered || value.isSelected() ? 255.0f : 140.0f) * alpha));
 
                             if (itemHovered) CursorUtility.set(CursorType.HAND);
                             choicesY += 12.0f;
                         }
-                        currentY += ms.getValues().size() * 12.0f + 4.0f;
+                        ScissorUtility.pop();
                     }
+                    currentY += 25.0f + progress * choicesH;
+
+                } else if (setting instanceof moscow.rockstar.systems.setting.settings.BindSetting) {
+                    moscow.rockstar.systems.setting.settings.BindSetting bindSetting = (moscow.rockstar.systems.setting.settings.BindSetting) setting;
+                    boolean hovered = GuiUtility.isHovered(x + padding, currentY, width - padding * 2, 14.0f, context);
+
+                    // Label on left
+                    context.drawText(Fonts.REGULAR.getFont(6.5f), Localizator.translate(bindSetting.getName()), x + padding, currentY + 3.5f, Colors.getTextColor().withAlpha(160.0f * alpha));
+
+                    // Button on right
+                    int bindKey = bindSetting.getKey();
+                    String settingBindText = (this.bindingSetting == bindSetting) ? "..." : (bindKey == -1 ? "None" : TextUtility.getKeyName(bindKey));
+                    float btnW = Fonts.REGULAR.getFont(6.0f).width("⌨ " + settingBindText) + 8.0f;
+                    float btnX = x + width - padding - btnW;
+                    float btnY = currentY + 1.0f;
+                    float btnH = 12.0f;
+
+                    boolean btnHovered = GuiUtility.isHovered(btnX, btnY, btnW, btnH, context);
+                    this.drawBindButton(context, btnX, btnY, btnW, btnH, settingBindText, btnHovered, alpha);
+                    if (btnHovered) CursorUtility.set(CursorType.HAND);
+
+                    currentY += 16.0f;
 
                 } else if (setting instanceof moscow.rockstar.systems.setting.settings.ColorSetting) {
                     moscow.rockstar.systems.setting.settings.ColorSetting cs = (moscow.rockstar.systems.setting.settings.ColorSetting) setting;
@@ -644,69 +747,7 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
     }
 
     private void renderThemesTab(UIContext context, float x, float y, float width, float height, float alpha) {
-        boolean dark = Rockstar.getInstance().getThemeManager().getCurrentTheme() == Theme.DARK;
-        ColorRGBA outlineColor = dark ? new ColorRGBA(28.0f, 35.0f, 48.0f, 255.0f * alpha) : new ColorRGBA(220.0f, 220.0f, 225.0f, 255.0f * alpha);
-
-        // Render central themes management box
-        float boxW = 280.0f;
-        float boxH = 140.0f;
-        float boxX = x + width / 2.0f - boxW / 2.0f;
-        float boxY = y + height / 2.0f - boxH / 2.0f - 10.0f;
-
-        context.drawRoundedRect(boxX, boxY, boxW, boxH, BorderRadius.all(8.0f), dark ? new ColorRGBA(16.0f, 21.0f, 30.0f, 255.0f * alpha) : new ColorRGBA(255.0f, 255.0f, 255.0f, 255.0f * alpha));
-        context.drawRoundedBorder(boxX, boxY, boxW, boxH, 0.5f, BorderRadius.all(8.0f), outlineColor);
-
-        // Theme Style Toggle: Dark / Light
-        context.drawText(Fonts.SEMIBOLD.getFont(9.0f), "Style:", boxX + 15.0f, boxY + 20.0f, Colors.getTextColor().withAlpha(alpha * 255.0f));
-
-        float toggleDarkX = boxX + 80.0f;
-        boolean darkBtnHover = GuiUtility.isHovered(toggleDarkX, boxY + 15.0f, 60.0f, 16.0f, context);
-        context.drawRoundedRect(toggleDarkX, boxY + 15.0f, 60.0f, 16.0f, BorderRadius.all(4.0f), dark ? Colors.getAccentColor() : (darkBtnHover ? outlineColor : outlineColor.withAlpha(100.0f)));
-        context.drawCenteredText(Fonts.MEDIUM.getFont(7.5f), "Dark", toggleDarkX + 30.0f, boxY + 19.5f, (dark ? ColorRGBA.WHITE : Colors.getTextColor()).withAlpha(alpha * 255.0f));
-        if (darkBtnHover) CursorUtility.set(CursorType.HAND);
-
-        float toggleLightX = boxX + 145.0f;
-        boolean lightBtnHover = GuiUtility.isHovered(toggleLightX, boxY + 15.0f, 60.0f, 16.0f, context);
-        context.drawRoundedRect(toggleLightX, boxY + 15.0f, 60.0f, 16.0f, BorderRadius.all(4.0f), !dark ? Colors.getAccentColor() : (lightBtnHover ? outlineColor : outlineColor.withAlpha(100.0f)));
-        context.drawCenteredText(Fonts.MEDIUM.getFont(7.5f), "Light", toggleLightX + 30.0f, boxY + 19.5f, (!dark ? ColorRGBA.WHITE : Colors.getTextColor()).withAlpha(alpha * 255.0f));
-        if (lightBtnHover) CursorUtility.set(CursorType.HAND);
-
-        // Predefined Accent Colors
-        context.drawText(Fonts.SEMIBOLD.getFont(9.0f), "Accent:", boxX + 15.0f, boxY + 60.0f, Colors.getTextColor().withAlpha(alpha * 255.0f));
-
-        ColorRGBA[] colors = new ColorRGBA[]{
-                new ColorRGBA(151.0f, 71.0f, 255.0f), // Purple
-                new ColorRGBA(255.0f, 80.0f, 80.0f),   // Red
-                new ColorRGBA(80.0f, 255.0f, 80.0f),   // Green
-                new ColorRGBA(80.0f, 180.0f, 255.0f),  // Blue
-                new ColorRGBA(255.0f, 170.0f, 0.0f),   // Orange
-                new ColorRGBA(0.0f, 230.0f, 230.0f)    // Cyan
-        };
-
-        float startColorX = boxX + 80.0f;
-        ColorRGBA currentAccent = Rockstar.getInstance().getThemeManager().getAccentColor();
-
-        for (int i = 0; i < colors.length; i++) {
-            float cX = startColorX + i * 20.0f;
-            boolean cHovered = GuiUtility.isHovered(cX, boxY + 57.0f, 12.0f, 12.0f, context);
-            boolean isSelected = colors[i].equals(currentAccent);
-
-            context.drawRoundedRect(cX, boxY + 57.0f, 12.0f, 12.0f, BorderRadius.all(6.0f), colors[i].withAlpha(alpha * 255.0f));
-            if (isSelected) {
-                context.drawRoundedBorder(cX - 2.0f, boxY + 55.0f, 16.0f, 16.0f, 1.0f, BorderRadius.all(8.0f), Colors.getAccentColor());
-            } else if (cHovered) {
-                context.drawRoundedBorder(cX - 2.0f, boxY + 55.0f, 16.0f, 16.0f, 1.0f, BorderRadius.all(8.0f), Colors.getTextColor().withAlpha(100.0f));
-                CursorUtility.set(CursorType.HAND);
-            }
-        }
-
-        // Custom Color Accent setting button
-        float pickerBtnX = boxX + 80.0f;
-        float pickerBtnY = boxY + 95.0f;
-        boolean pickerHovered = GuiUtility.isHovered(pickerBtnX, pickerBtnY, 120.0f, 16.0f, context);
-        context.drawRoundedRect(pickerBtnX, pickerBtnY, 120.0f, 16.0f, BorderRadius.all(4.0f), pickerHovered ? outlineColor : outlineColor.withAlpha(100.0f));
-        context.drawCenteredText(Fonts.MEDIUM.getFont(7.0f), "Choose Custom Color", pickerBtnX + 60.0f, pickerBtnY + 4.5f, Colors.getTextColor().withAlpha(alpha * 255.0f));
-        if (pickerHovered) CursorUtility.set(CursorType.HAND);
+        // Leave empty as requested
     }
 
     private ModuleCategory getCategoryFromTab(int tabIndex) {
@@ -769,10 +810,13 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
         }
 
         // 3. Tab navigation clicks
-        float tabsStartX = x + width / 2.0f - 150.0f;
+        float navBarWidth = 180.0f;
+        float navBarX = x + (width - navBarWidth) / 2.0f;
+        float navBarY = y + 6.0f;
+        float step = navBarWidth / 7.0f;
         for (int i = 0; i < 7; i++) {
-            float tabX = tabsStartX + i * 40.0f;
-            if (GuiUtility.isHovered(tabX, y + 4.0f, 36.0f, 20.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
+            float tabX = navBarX + i * step;
+            if (GuiUtility.isHovered(tabX, navBarY, step, 18.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
                 this.activeTab = i;
                 this.scrollHandler.reset();
                 this.scrollHandler.scroll(0);
@@ -781,11 +825,18 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
             }
         }
 
-        // Module keys binding handler
+        // Module/Setting keys binding handler
         if (this.bindingModule != null) {
             if (button == MouseButton.LEFT || button == MouseButton.RIGHT) {
                 this.bindingModule.setKey(button.getButtonIndex());
                 this.bindingModule = null;
+                return;
+            }
+        }
+        if (this.bindingSetting != null) {
+            if (button == MouseButton.LEFT || button == MouseButton.RIGHT) {
+                this.bindingSetting.setKey(button.getButtonIndex());
+                this.bindingSetting = null;
                 return;
             }
         }
@@ -838,23 +889,23 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                         float actionsX = cardX + colWidth - padding;
 
                         // Switch toggle
-                        actionsX -= 12.0f;
-                        if (GuiUtility.isHovered(actionsX, headerY, 12.0f, 10.0f, mouseX, mouseY)) {
+                        actionsX -= 18.0f;
+                        if (GuiUtility.isHovered(actionsX, headerY - 1.0f, 18.0f, 10.0f, mouseX, mouseY)) {
                             module.toggle();
+                            ClientSounds.CLICKGUI_OPEN.play(0.5f, module.isEnabled() ? 1.0f : 0.8f);
                             return;
                         }
-                        actionsX -= 6.0f;
 
                         // Bind button
                         int key = module.getKey();
                         String bindText = (key == -1) ? "None" : TextUtility.getKeyName(key);
-                        float bindTextWidth = Fonts.REGULAR.getFont(5.5f).width(bindText) + 6.0f;
-                        actionsX -= bindTextWidth;
-                        if (GuiUtility.isHovered(actionsX, headerY - 1.0f, bindTextWidth, 10.0f, mouseX, mouseY)) {
+                        float bindTextWidth = Fonts.REGULAR.getFont(5.5f).width(bindText) + 10.0f;
+                        actionsX -= (bindTextWidth + 4.0f);
+                        if (GuiUtility.isHovered(actionsX, headerY - 2.0f, bindTextWidth, 12.0f, mouseX, mouseY)) {
                             this.bindingModule = module;
+                            this.bindingSetting = null;
                             return;
                         }
-                        actionsX -= 6.0f;
 
                         // Star favorite button
                         actionsX -= 10.0f;
@@ -891,16 +942,18 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                             } else if (setting instanceof moscow.rockstar.systems.setting.settings.SelectSetting) {
                                 moscow.rockstar.systems.setting.settings.SelectSetting ss = (moscow.rockstar.systems.setting.settings.SelectSetting) setting;
                                 boolean expanded = this.expandedSettings.getOrDefault(ss, false);
+                                Animation anim = this.settingAnimations.computeIfAbsent(ss, s -> new Animation(200L, Easing.BAKEK));
+                                float progress = anim.getRGB();
 
-                                if (GuiUtility.isHovered(cardX + padding, currentSettingY, colWidth - padding * 2, 12.0f, mouseX, mouseY)) {
+                                if (GuiUtility.isHovered(cardX + padding, currentSettingY + 10.0f, colWidth - padding * 2, 13.0f, mouseX, mouseY)) {
                                     this.expandedSettings.put(ss, !expanded);
                                     ClientSounds.CLICKGUI_OPEN.play(0.4f, 1.0f);
                                     return;
                                 }
-                                currentSettingY += 16.0f;
 
-                                if (expanded) {
-                                    float choicesY = currentSettingY;
+                                float choicesH = ss.getValues().size() * 12.0f + 4.0f;
+                                if (expanded && mouseY >= currentSettingY + 24.0f && mouseY < currentSettingY + 24.0f + progress * choicesH) {
+                                    float choicesY = currentSettingY + 24.0f;
                                     for (moscow.rockstar.systems.setting.settings.SelectSetting.Value value : ss.getValues()) {
                                         if (GuiUtility.isHovered(cardX + padding, choicesY, colWidth - padding * 2, 11.0f, mouseX, mouseY)) {
                                             value.toggle();
@@ -909,33 +962,51 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                                         }
                                         choicesY += 12.0f;
                                     }
-                                    currentSettingY += ss.getValues().size() * 12.0f + 4.0f;
                                 }
+                                currentSettingY += 25.0f + progress * choicesH;
 
                             } else if (setting instanceof moscow.rockstar.systems.setting.settings.ModeSetting) {
                                 moscow.rockstar.systems.setting.settings.ModeSetting ms = (moscow.rockstar.systems.setting.settings.ModeSetting) setting;
                                 boolean expanded = this.expandedSettings.getOrDefault(ms, false);
+                                Animation anim = this.settingAnimations.computeIfAbsent(ms, s -> new Animation(200L, Easing.BAKEK));
+                                float progress = anim.getRGB();
 
-                                if (GuiUtility.isHovered(cardX + padding, currentSettingY, colWidth - padding * 2, 12.0f, mouseX, mouseY)) {
+                                if (GuiUtility.isHovered(cardX + padding, currentSettingY + 10.0f, colWidth - padding * 2, 13.0f, mouseX, mouseY)) {
                                     this.expandedSettings.put(ms, !expanded);
                                     ClientSounds.CLICKGUI_OPEN.play(0.4f, 1.0f);
                                     return;
                                 }
-                                currentSettingY += 16.0f;
 
-                                if (expanded) {
-                                    float choicesY = currentSettingY;
+                                float choicesH = ms.getValues().size() * 12.0f + 4.0f;
+                                if (expanded && mouseY >= currentSettingY + 24.0f && mouseY < currentSettingY + 24.0f + progress * choicesH) {
+                                    float choicesY = currentSettingY + 24.0f;
                                     for (moscow.rockstar.systems.setting.settings.ModeSetting.Value value : ms.getValues()) {
                                         if (GuiUtility.isHovered(cardX + padding, choicesY, colWidth - padding * 2, 11.0f, mouseX, mouseY)) {
                                             value.select();
-                                            this.expandedSettings.put(ms, false); // collapse after select
+                                            this.expandedSettings.put(ms, false);
                                             ClientSounds.CLICKGUI_OPEN.play(0.3f, 1.1f);
                                             return;
                                         }
                                         choicesY += 12.0f;
                                     }
-                                    currentSettingY += ms.getValues().size() * 12.0f + 4.0f;
                                 }
+                                currentSettingY += 25.0f + progress * choicesH;
+
+                            } else if (setting instanceof moscow.rockstar.systems.setting.settings.BindSetting) {
+                                moscow.rockstar.systems.setting.settings.BindSetting bindSetting = (moscow.rockstar.systems.setting.settings.BindSetting) setting;
+                                int bindKey = bindSetting.getKey();
+                                String settingBindText = (this.bindingSetting == bindSetting) ? "..." : (bindKey == -1 ? "None" : TextUtility.getKeyName(bindKey));
+                                float btnW = Fonts.REGULAR.getFont(6.0f).width("⌨ " + settingBindText) + 8.0f;
+                                float btnX = cardX + colWidth - padding - btnW;
+                                float btnY = currentSettingY + 1.0f;
+                                float btnH = 12.0f;
+
+                                if (GuiUtility.isHovered(btnX, btnY, btnW, btnH, mouseX, mouseY)) {
+                                    this.bindingSetting = bindSetting;
+                                    this.bindingModule = null;
+                                    return;
+                                }
+                                currentSettingY += 16.0f;
 
                             } else if (setting instanceof moscow.rockstar.systems.setting.settings.ColorSetting) {
                                 moscow.rockstar.systems.setting.settings.ColorSetting cs = (moscow.rockstar.systems.setting.settings.ColorSetting) setting;
@@ -1011,57 +1082,7 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
                 listY += 25.0f;
             }
         } else if (this.activeTab == 6) {
-            // Themes tab click checks
-            float boxW = 280.0f;
-            float boxH = 140.0f;
-            float boxX = contentX + contentWidth / 2.0f - boxW / 2.0f;
-            float boxY = contentY + contentHeight / 2.0f - boxH / 2.0f - 10.0f;
-
-            // Dark/Light toggle buttons
-            float toggleDarkX = boxX + 80.0f;
-            if (GuiUtility.isHovered(toggleDarkX, boxY + 15.0f, 60.0f, 16.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
-                Rockstar.getInstance().getThemeManager().setCurrentTheme(Theme.DARK);
-                ClientSounds.CLICKGUI_OPEN.play(0.5f, 1.1f);
-                return;
-            }
-
-            float toggleLightX = boxX + 145.0f;
-            if (GuiUtility.isHovered(toggleLightX, boxY + 15.0f, 60.0f, 16.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
-                Rockstar.getInstance().getThemeManager().setCurrentTheme(Theme.LIGHT);
-                ClientSounds.CLICKGUI_OPEN.play(0.5f, 1.1f);
-                return;
-            }
-
-            // Accent color selections
-            ColorRGBA[] colors = new ColorRGBA[]{
-                    new ColorRGBA(151.0f, 71.0f, 255.0f), // Purple
-                    new ColorRGBA(255.0f, 80.0f, 80.0f),   // Red
-                    new ColorRGBA(80.0f, 255.0f, 80.0f),   // Green
-                    new ColorRGBA(80.0f, 180.0f, 255.0f),  // Blue
-                    new ColorRGBA(255.0f, 170.0f, 0.0f),   // Orange
-                    new ColorRGBA(0.0f, 230.0f, 230.0f)    // Cyan
-            };
-            float startColorX = boxX + 80.0f;
-            for (int i = 0; i < colors.length; i++) {
-                float cX = startColorX + i * 20.0f;
-                if (GuiUtility.isHovered(cX, boxY + 57.0f, 12.0f, 12.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
-                    Rockstar.getInstance().getThemeManager().setAccentColor(colors[i]);
-                    ClientSounds.CLICKGUI_OPEN.play(0.5f, 1.2f);
-                    return;
-                }
-            }
-
-            // Custom color accent picker button
-            float pickerBtnX = boxX + 80.0f;
-            float pickerBtnY = boxY + 95.0f;
-            if (GuiUtility.isHovered(pickerBtnX, pickerBtnY, 120.0f, 16.0f, mouseX, mouseY) && button == MouseButton.LEFT) {
-                ColorRGBA currentAccent = Rockstar.getInstance().getThemeManager().getAccentColor();
-                ColorPicker picker = new ColorPicker((float) mouseX, (float) mouseY, 6.0f, false, currentAccent, "Accent Color");
-                picker.setOnClose(() -> Rockstar.getInstance().getThemeManager().setAccentColor(picker.built()));
-                this.colorPickers.add(picker);
-                ClientSounds.CLICKGUI_OPEN.play(0.5f, 1.1f);
-                return;
-            }
+            // Themes tab click checks are empty as requested
         }
 
         // Draggable screen support
@@ -1128,6 +1149,16 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
             return true;
         }
 
+        if (this.bindingSetting != null) {
+            if (keyCode == 256 || keyCode == 261) { // Esc or Delete
+                this.bindingSetting.setKey(-1);
+            } else {
+                this.bindingSetting.setKey(keyCode);
+            }
+            this.bindingSetting = null;
+            return true;
+        }
+
         this.scrollHandler.onKeyPressed(keyCode);
 
         for (ColorPicker colorPicker : this.colorPickers) {
@@ -1148,7 +1179,7 @@ public class TestScreen extends MenuScreen implements IMinecraft, IScaledResolut
     @Override
     public boolean charTyped(CharacterEvent event) {
         char chr = (char) event.codepoint();
-        if (this.bindingModule != null) {
+        if (this.bindingModule != null || this.bindingSetting != null) {
             return true;
         }
         if (this.searchField.isFocused()) {
