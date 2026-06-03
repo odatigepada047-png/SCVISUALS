@@ -58,6 +58,7 @@
     "minecraft.client.render.block.entity.ShulkerBoxRenderStateMixin",
     "minecraft.client.render.entity.ItemEntityRendererMixin",
     "minecraft.client.render.entity.LivingEntityRendererMixin",
+    "minecraft.client.render.feature.ModelFeatureRendererMixin",
     "minecraft.entity.EntityRendererMixin",
     "minecraft.network.ClientPlayNetworkHandlerMixin",
     "minecraft.render.EntityRendererMixin",

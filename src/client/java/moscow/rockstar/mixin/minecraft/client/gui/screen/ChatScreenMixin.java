@@ -25,6 +25,9 @@ public class ChatScreenMixin implements IMinecraft {
     @Inject(method={"handleChatInput"}, at={@At(value="HEAD")}, cancellable=true)
     private void onSendMessage(String text, boolean addToHistory, CallbackInfo ci) {
         if (Rockstar.getInstance().getCommandManager().dispatch(text)) {
+            if (addToHistory) {
+                mc.gui.getChat().addRecentChat(text);
+            }
             ci.cancel();
         }
     }

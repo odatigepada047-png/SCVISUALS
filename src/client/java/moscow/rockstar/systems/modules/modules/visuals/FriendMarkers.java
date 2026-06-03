@@ -48,7 +48,6 @@ extends BaseModule {
     private final ModeSetting setting = new ModeSetting(this, "modules.settings.friends_markers.setting");
     private final ModeSetting.Value heads = new ModeSetting.Value(this.setting, "modules.settings.friends_markers.heads");
     private final ModeSetting.Value sims = new ModeSetting.Value(this.setting, "Sims");
-    private final java.util.Map<java.util.UUID, Vec3> crystalPositions = new java.util.HashMap<>();
 
     private final EventListener<Render3DEvent> onRender3D = event -> {
         if (RenderSystem.outputColorTextureOverride != null) {
@@ -64,28 +63,13 @@ extends BaseModule {
         BufferBuilder builder = CrystalRenderer.createBuffer();
         float tickDelta = event.getGameTimeDeltaPartialTick();
 
-        this.crystalPositions.keySet().removeIf(uuid -> FriendMarkers.mc.level.getPlayerByUUID(uuid) == null);
-
         for (AbstractClientPlayer player : FriendMarkers.mc.level.players()) {
             if (!player.isAlive() || !Rockstar.getInstance().getFriendManager().isFriend(player.getName().getString())) continue;
 
-            java.util.UUID uuid = player.getUUID();
             Vec3 targetPos = Utils.getInterpolatedPos((Entity)player, tickDelta);
-            Vec3 currentPos = this.crystalPositions.get(uuid);
-            if (currentPos == null || currentPos.distanceTo(targetPos) > 10.0) {
-                currentPos = targetPos;
-            } else {
-                double lerpFactor = 0.15;
-                currentPos = new Vec3(
-                    currentPos.x + (targetPos.x - currentPos.x) * lerpFactor,
-                    currentPos.y + (targetPos.y - currentPos.y) * lerpFactor,
-                    currentPos.z + (targetPos.z - currentPos.z) * lerpFactor
-                );
-            }
-            this.crystalPositions.put(uuid, currentPos);
 
             ms.pushPose();
-            RenderUtility.prepareMatrices(ms, currentPos);
+            RenderUtility.prepareMatrices(ms, targetPos);
             this.renderSimsCrystal(ms, builder, player, tickDelta, color);
             ms.popPose();
         }
@@ -99,7 +83,6 @@ extends BaseModule {
 
     @Override
     public void onDisable() {
-        this.crystalPositions.clear();
         super.onDisable();
     }
 

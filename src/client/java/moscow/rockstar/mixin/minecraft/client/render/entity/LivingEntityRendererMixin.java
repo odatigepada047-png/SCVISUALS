@@ -63,6 +63,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.model.Model;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 
 @Mixin(value={LivingEntityRenderer.class})
 public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> {
@@ -150,40 +154,27 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
         return pitch;
     }
 
-    @WrapOperation(method={"submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"}, at={@At(value="INVOKE", target="Lnet/minecraft/client/model/Model;renderToBuffer(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V")}, require=0)
-    private void changeModelColor(EntityModel<?> instance, PoseStack matrixStack, VertexConsumer vertexConsumer, int light, int overlay, int color, Operation<Void> original, @Local(argsOnly=true) S livingEntityRenderState) {
+    @WrapOperation(method={"submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"}, at={@At(value="INVOKE", target="Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V")}, require=1)
+    private void changeModelColor(
+        SubmitNodeCollector collector,
+        Model instance,
+        Object state,
+        PoseStack matrixStack,
+        RenderType renderType,
+        int light,
+        int overlay,
+        int color,
+        TextureAtlasSprite sprite,
+        int p9,
+        ModelFeatureRenderer.CrumblingOverlay crumbling,
+        Operation<Void> original,
+        @Local(argsOnly=true) S livingEntityRenderState
+    ) {
         Entity entity = ((EntityRenderStateAddition)livingEntityRenderState).rockstar$getEntity();
-        FriendMarkers markers = rockstar$getFriendMarkers();
-        boolean scaleFriendHead = false;
-        float oldHeadXScale = 1.0f;
-        float oldHeadYScale = 1.0f;
-        float oldHeadZScale = 1.0f;
-        float oldHatXScale = 1.0f;
-        float oldHatYScale = 1.0f;
-        float oldHatZScale = 1.0f;
         if (entity instanceof Player) {
             Player player = (Player)entity;
             if (instance instanceof HumanoidModel) {
                 HumanoidModel model = (HumanoidModel)instance;
-                if (markers.isEnabled() && markers.getHeads().isSelected() && Rockstar.getInstance().getFriendManager().isFriend(player.getName().getString())) {
-                    BipedEntityModelAccessor accessor = (BipedEntityModelAccessor)model;
-                    float scale = 1.35f;
-                    ModelPart head = accessor.rockstar$getHead();
-                    ModelPart hat = accessor.rockstar$getHat();
-                    oldHeadXScale = head.xScale;
-                    oldHeadYScale = head.yScale;
-                    oldHeadZScale = head.zScale;
-                    oldHatXScale = hat.xScale;
-                    oldHatYScale = hat.yScale;
-                    oldHatZScale = hat.zScale;
-                    head.xScale = scale;
-                    head.yScale = scale;
-                    head.zScale = scale;
-                    hat.xScale = scale;
-                    hat.yScale = scale;
-                    hat.zScale = scale;
-                    scaleFriendHead = true;
-                }
                 
                 // Получаем координаты для Skeleton ESP
                 moscow.rockstar.systems.modules.modules.visuals.TargetESP targetESP = rockstar$getTargetESP();
@@ -257,18 +248,7 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
             color = targetESP.getColor().withAlpha(127.0f).getRGB();
             light = 0xF000F0;
         }
-        original.call(new Object[]{instance, matrixStack, vertexConsumer, light, overlay, color});
-        if (scaleFriendHead && instance instanceof HumanoidModel) {
-            BipedEntityModelAccessor accessor = (BipedEntityModelAccessor)instance;
-            ModelPart head = accessor.rockstar$getHead();
-            ModelPart hat = accessor.rockstar$getHat();
-            head.xScale = oldHeadXScale;
-            head.yScale = oldHeadYScale;
-            head.zScale = oldHeadZScale;
-            hat.xScale = oldHatXScale;
-            hat.yScale = oldHatYScale;
-            hat.zScale = oldHatZScale;
-        }
+        original.call(new Object[]{collector, instance, state, matrixStack, renderType, light, overlay, color, sprite, p9, crumbling});
     }
     @ModifyVariable(method = "getRenderType", at = @At("HEAD"), ordinal = 2, argsOnly = true)
     private boolean disableLocalPlayerOutline(boolean showOutline, S state) {

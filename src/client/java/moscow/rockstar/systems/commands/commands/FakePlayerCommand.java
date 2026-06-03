@@ -43,6 +43,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.particles.ParticleTypes;
 
 public class FakePlayerCommand
 implements IMinecraft {
@@ -52,8 +53,20 @@ implements IMinecraft {
     private final EventListener<AttackEvent> onAttackEvent = event -> {
         if (this.fakePlayer != null && event.getEntity() == this.fakePlayer && this.fakePlayer.hurtTime == 0) {
             FakePlayerCommand.mc.level.playSound((Player)FakePlayerCommand.mc.player, this.fakePlayer.getX(), this.fakePlayer.getY(), this.fakePlayer.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0f, 1.0f);
-            if (FakePlayerCommand.mc.player.fallDistance > 0.0f) {
+            boolean isCrit = !FakePlayerCommand.mc.player.onGround() && !FakePlayerCommand.mc.player.onClimbable() && !FakePlayerCommand.mc.player.isInWater() && !FakePlayerCommand.mc.player.isPassenger();
+            if (isCrit) {
                 FakePlayerCommand.mc.level.playSound((Player)FakePlayerCommand.mc.player, this.fakePlayer.getX(), this.fakePlayer.getY(), this.fakePlayer.getZ(), SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.PLAYERS, 1.0f, 1.0f);
+                for (int i = 0; i < 15; i++) {
+                    FakePlayerCommand.mc.level.addParticle(
+                        ParticleTypes.CRIT,
+                        this.fakePlayer.getRandomX(0.5),
+                        this.fakePlayer.getRandomY(),
+                        this.fakePlayer.getRandomZ(0.5),
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5
+                    );
+                }
             } else {
                 FakePlayerCommand.mc.level.playSound((Player)FakePlayerCommand.mc.player, this.fakePlayer.getX(), this.fakePlayer.getY(), this.fakePlayer.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 1.0f, 1.0f);
             }

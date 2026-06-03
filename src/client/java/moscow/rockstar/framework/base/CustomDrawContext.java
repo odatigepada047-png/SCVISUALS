@@ -294,8 +294,6 @@ public class CustomDrawContext
                     var slot = atlas.getOrUpdate(state);
                     if (slot != null && slot.textureView() != null) {
                         try {
-                            // GuiItemAtlas uses framebuffer-space UVs, so v is flipped:
-                            // v0 = bottom of slot in atlas, v1 = top of slot in atlas
                             float u1 = slot.u0();
                             float u2 = slot.u1();
                             float vTop = slot.v0();
@@ -322,7 +320,6 @@ public class CustomDrawContext
                                 com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
                                 com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR
                             );
-                            // TL, BL, BR, TR  (screen space: y increases downward)
                             builder.addVertex(matrix4f, x,        y,        0.0f).setUv(u1, vTop).setColor(color);
                             builder.addVertex(matrix4f, x,        y + size, 0.0f).setUv(u1, vBot).setColor(color);
                             builder.addVertex(matrix4f, x + size, y + size, 0.0f).setUv(u2, vBot).setColor(color);

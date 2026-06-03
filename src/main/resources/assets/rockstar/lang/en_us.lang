@@ -97,6 +97,7 @@ modules.settings.target_esp.mode.marker=Marker
 modules.settings.target_esp.mode.jelly=Jelly
 modules.settings.target_esp.mode.skeleton=Skeleton
 modules.settings.target_esp.mode.chains=Chains
+modules.settings.target_esp.mode.swords=Swords
 modules.settings.target_esp.souls_style=Souls Style
 modules.settings.target_esp.souls_style.wraith=Wraiths
 modules.settings.target_esp.souls_style.triangle=Triangles

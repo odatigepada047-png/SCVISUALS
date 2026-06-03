@@ -79,15 +79,21 @@ IWindow {
     }
 
     public static void prepareMatrices(PoseStack matrices) {
-        Camera camera = RenderUtility.mc.gameRenderer.getMainCamera();
-        Vec3 cameraPos = camera.position();
+        Vec3 cameraPos = Utils.getCachedCameraPos();
+        if (cameraPos == null) {
+            Camera camera = RenderUtility.mc.gameRenderer.getMainCamera();
+            cameraPos = camera.position();
+        }
         Vec3 renderPos = Vec3.ZERO.subtract(cameraPos);
         matrices.translate(renderPos.x, renderPos.y, renderPos.z);
     }
 
     public static void prepareMatrices(PoseStack matrices, Vec3 pos) {
-        Camera camera = RenderUtility.mc.gameRenderer.getMainCamera();
-        Vec3 cameraPos = camera.position();
+        Vec3 cameraPos = Utils.getCachedCameraPos();
+        if (cameraPos == null) {
+            Camera camera = RenderUtility.mc.gameRenderer.getMainCamera();
+            cameraPos = camera.position();
+        }
         Vec3 renderPos = pos.subtract(cameraPos);
         matrices.translate(renderPos.x, renderPos.y, renderPos.z);
     }

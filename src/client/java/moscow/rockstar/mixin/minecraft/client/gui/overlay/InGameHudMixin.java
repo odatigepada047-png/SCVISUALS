@@ -23,6 +23,7 @@ public class InGameHudMixin
 implements IMinecraft {
     private static final int SATURATION_TINT = 0xFFFFFFFF;
     private static final int SATURATION_Y_OFFSET = 10;
+    private static final Identifier FOOD_EMPTY_ICON = Identifier.withDefaultNamespace("hud/food_empty");
     private static final Identifier FOOD_FULL_ICON = Identifier.withDefaultNamespace("hud/food_full");
     private static final Identifier FOOD_HALF_ICON = Identifier.withDefaultNamespace("hud/food_half");
 
@@ -103,8 +104,10 @@ implements IMinecraft {
             int iconX = screenWidth / 2 + 91 - i * 8 - 9;
             float iconSaturation = saturation - i * 2;
             if (iconSaturation >= 2.0f) {
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, FOOD_EMPTY_ICON, iconX, barY, 9, 9);
                 context.blitSprite(RenderPipelines.GUI_TEXTURED, FOOD_FULL_ICON, iconX, barY, 9, 9, SATURATION_TINT);
             } else if (iconSaturation > 0.0f) {
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, FOOD_EMPTY_ICON, iconX, barY, 9, 9);
                 context.blitSprite(RenderPipelines.GUI_TEXTURED, FOOD_HALF_ICON, iconX, barY, 9, 9, SATURATION_TINT);
             }
         }

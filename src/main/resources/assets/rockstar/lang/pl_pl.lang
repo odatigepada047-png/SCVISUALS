@@ -93,6 +93,7 @@ modules.settings.target_esp.mode.marker=Znacznik
 modules.settings.target_esp.mode.jelly=Galaretka
 modules.settings.target_esp.mode.skeleton=Szkielet
 modules.settings.target_esp.mode.chains=Łańcuchy
+modules.settings.target_esp.mode.swords=Miecze
 modules.settings.target_esp.souls_style=Styl dusz
 modules.settings.target_esp.souls_style.wraith=Zjawy
 modules.settings.target_esp.souls_style.triangle=Trójkąty

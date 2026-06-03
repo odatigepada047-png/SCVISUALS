@@ -133,6 +133,7 @@ modules.settings.target_esp.mode.marker=Маркер
 modules.settings.target_esp.mode.jelly=Желе
 modules.settings.target_esp.mode.skeleton=Скелет
 modules.settings.target_esp.mode.chains=Ланцюги
+modules.settings.target_esp.mode.swords=Мечі
 modules.settings.target_esp.souls_style=Стиль душ
 modules.settings.target_esp.souls_style.wraith=Привиди
 modules.settings.target_esp.souls_style.triangle=Трикутники
