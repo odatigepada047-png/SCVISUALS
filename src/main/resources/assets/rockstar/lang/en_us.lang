@@ -777,6 +777,13 @@ modules.settings.ambience.bright=Enable brightness
 modules.settings.menu.mode=Mode
 modules.settings.menu.mode.dropdown=Panels
 modules.settings.menu.mode.modern=Modern
+modules.settings.menu.mode.test=Test
+
+configs.new_name=New Config Name
+configs.create=Create
+configs.load=Load
+configs.save=Save
+configs.delete=Delete
 
 
 # View Model

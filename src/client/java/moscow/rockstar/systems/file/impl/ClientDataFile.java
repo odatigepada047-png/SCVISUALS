@@ -54,6 +54,14 @@ implements IMinecraft {
         json.add("hudElements", (JsonElement)this.getHudElementsJsonArray());
         json.add("friends", (JsonElement)this.getFriendsJsonArray());
         json.add("colorPickerPresets", (JsonElement)this.getColorPickerPresetsJsonArray());
+        
+        JsonArray favoritesJsonArray = new JsonArray();
+        for (moscow.rockstar.systems.modules.Module module : Rockstar.getInstance().getModuleManager().getModules()) {
+            if (module.isFavorite()) {
+                favoritesJsonArray.add(module.getName());
+            }
+        }
+        json.add("favorites", favoritesJsonArray);
         ConfigFile currentConfig = Rockstar.getInstance().getConfigManager().getCurrent();
         if (currentConfig != null) {
             json.addProperty("lastConfig", currentConfig.getFileName());
@@ -129,6 +137,20 @@ implements IMinecraft {
                 Rockstar.getInstance().getFriendManager().clear();
                 for (JsonElement friendElement : friendsArray) {
                     Rockstar.getInstance().getFriendManager().add(friendElement.getAsString());
+                }
+            }
+            if (object.has("favorites")) {
+                JsonArray favoritesArray = object.getAsJsonArray("favorites");
+                for (moscow.rockstar.systems.modules.Module module : Rockstar.getInstance().getModuleManager().getModules()) {
+                    module.setFavorite(false);
+                }
+                for (JsonElement favElement : favoritesArray) {
+                    try {
+                        moscow.rockstar.systems.modules.Module module = Rockstar.getInstance().getModuleManager().getModule(favElement.getAsString());
+                        if (module != null) {
+                            module.setFavorite(true);
+                        }
+                    } catch (Exception e) {}
                 }
             }
             if (object.has("colorPickerPresets")) {

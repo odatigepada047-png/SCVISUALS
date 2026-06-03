@@ -776,6 +776,13 @@ modules.settings.ambience.bright=Включить яркость
 modules.settings.menu.mode=Режим
 modules.settings.menu.mode.dropdown=Панели
 modules.settings.menu.mode.modern=Новый
+modules.settings.menu.mode.test=Тест
+
+configs.new_name=Имя нового конфига
+configs.create=Создать
+configs.load=Загрузить
+configs.save=Сохранить
+configs.delete=Удалить
 
 # View Model
 modules.settings.view_model.main_translate_x=Правая X-смещение

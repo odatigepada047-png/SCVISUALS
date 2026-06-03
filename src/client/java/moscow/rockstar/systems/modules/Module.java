@@ -45,5 +45,9 @@ SettingsContainer {
     public void setKey(int var1);
 
     public void setEnabled(boolean var1, boolean var2);
+
+    public boolean isFavorite();
+
+    public void setFavorite(boolean favorite);
 }
 

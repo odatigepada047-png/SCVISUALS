@@ -33,6 +33,7 @@ implements Module {
     private boolean hidden;
     private String name;
     private List<Setting> settings = new ArrayList<Setting>();
+    private boolean favorite;
     private final Animation keybindsAnimation = new Animation(300L, 0.0f, Easing.FIGMA_EASE_IN_OUT);
 
     public BaseModule() {
@@ -173,6 +174,16 @@ implements Module {
     @Generated
     public void setSettings(List<Setting> settings) {
         this.settings = settings;
+    }
+
+    @Override
+    public boolean isFavorite() {
+        return this.favorite;
+    }
+
+    @Override
+    public void setFavorite(boolean favorite) {
+        this.favorite = favorite;
     }
 }
 

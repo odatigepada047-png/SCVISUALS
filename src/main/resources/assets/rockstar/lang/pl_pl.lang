@@ -703,6 +703,13 @@ modules.settings.ambience.bright=włączyć jasność
 modules.settings.menu.mode=tryb
 modules.settings.menu.mode.dropdown=panele
 modules.settings.menu.mode.modern=nowy
+modules.settings.menu.mode.test=test
+
+configs.new_name=Nazwa nowej konfiguracji
+configs.create=Stworzyć
+configs.load=Załadować
+configs.save=Zapisać
+configs.delete=Usunąć
 
 # View Model
 modules.settings.view_model.main_translate_x=Prawy przesunięcie X
