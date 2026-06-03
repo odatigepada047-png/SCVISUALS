@@ -1,0 +1,16 @@
+{
+  "vertex": "rockstar:core/kawase_down/vertex",
+  "fragment": "rockstar:core/kawase_down/fragment",
+  "samplers": [
+    {
+      "name": "Sampler0"
+    }
+  ],
+  "uniforms": [
+    { "name": "Resolution", "type": "float", "count": 2, "values": [1.0, 1.0] },
+    { "name": "Offset", "type": "float", "count": 1, "values": [1.0] },
+    { "name": "Saturation", "type": "float", "count": 1, "values": [1.0] },
+    { "name": "TintIntensity", "type": "float", "count": 1, "values": [0.0] },
+    { "name": "TintColor", "type": "float", "count": 3, "values": [1.0, 1.0, 1.0] }
+  ]
+}

@@ -1,0 +1,12 @@
+Class: net.minecraft.client.gui.Gui$1DisplayEntry
+--- FIELDS ---
+net.minecraft.network.chat.Component name
+net.minecraft.network.chat.Component score
+int scoreWidth
+--- METHODS ---
+net.minecraft.network.chat.Component name()
+boolean equals(java.lang.Object)
+java.lang.String toString()
+int hashCode()
+net.minecraft.network.chat.Component score()
+int scoreWidth()

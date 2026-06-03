@@ -1,0 +1,14 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "rockstar:font/waypoint_icons.png",
+      "ascent": 20,
+      "height": 24,
+      "chars": [
+        "\u0041\u0042\u0043",
+        "\u0044\u0045\u0046"
+      ]
+    }
+  ]
+}

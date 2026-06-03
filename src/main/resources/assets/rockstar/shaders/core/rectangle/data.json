@@ -1,0 +1,10 @@
+{
+    "vertex": "rockstar:core/position_color",
+    "fragment": "rockstar:core/rectangle/fragment",
+    "samplers": [],
+    "uniforms": [
+        { "name": "Size", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+        { "name": "Radius", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
+        { "name": "Smoothness", "type": "float", "count": 1, "values": [ 1.0 ] }
+    ]
+}

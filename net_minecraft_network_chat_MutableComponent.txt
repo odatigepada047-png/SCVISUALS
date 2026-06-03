@@ -1,0 +1,25 @@
+Class: net.minecraft.network.chat.MutableComponent
+--- FIELDS ---
+net.minecraft.network.chat.ComponentContents contents
+java.util.List siblings
+net.minecraft.network.chat.Style style
+net.minecraft.util.FormattedCharSequence visualOrderText
+net.minecraft.locale.Language decomposedWith
+--- METHODS ---
+boolean equals(java.lang.Object)
+java.lang.String toString()
+net.minecraft.network.chat.MutableComponent append(java.lang.String)
+net.minecraft.network.chat.MutableComponent append(net.minecraft.network.chat.Component)
+int hashCode()
+net.minecraft.network.chat.MutableComponent create(net.minecraft.network.chat.ComponentContents)
+net.minecraft.network.chat.ComponentContents getContents()
+net.minecraft.network.chat.MutableComponent withStyle(net.minecraft.ChatFormatting)
+net.minecraft.network.chat.MutableComponent withStyle(net.minecraft.network.chat.Style)
+net.minecraft.network.chat.MutableComponent withStyle([Lnet.minecraft.ChatFormatting;)
+net.minecraft.network.chat.MutableComponent withStyle(java.util.function.UnaryOperator)
+net.minecraft.network.chat.Style getStyle()
+net.minecraft.network.chat.MutableComponent withoutShadow()
+net.minecraft.util.FormattedCharSequence getVisualOrderText()
+java.util.List getSiblings()
+net.minecraft.network.chat.MutableComponent withColor(int)
+net.minecraft.network.chat.MutableComponent setStyle(net.minecraft.network.chat.Style)

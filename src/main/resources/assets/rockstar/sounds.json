@@ -1,0 +1,74 @@
+{
+  "vebal": {
+    "sounds": [
+      {
+        "name": "rockstar:vebal",
+        "stream": false
+      }
+    ]
+  },
+  "applepay": {
+    "sounds": [
+      {
+        "name": "rockstar:applepay",
+        "stream": false
+      }
+    ]
+  },
+  "clickgui_open": {
+    "sounds": [
+      {
+        "name": "rockstar:clickgui_open",
+        "stream": false
+      }
+    ]
+  },
+  "critical": {
+    "sounds": [
+      {
+        "name": "rockstar:critical",
+        "stream": false
+      }
+    ]
+  },
+  "toggle": {
+    "sounds": [
+      {
+        "name": "rockstar:toggle",
+        "stream": false
+      }
+    ]
+  },
+  "typing": {
+    "sounds": [
+      {
+        "name": "rockstar:typing",
+        "stream": false
+      }
+    ]
+  },
+  "welcome": {
+    "sounds": [
+      {
+        "name": "rockstar:welcome",
+        "stream": false
+      }
+    ]
+  },
+  "lopez": {
+    "sounds": [
+      {
+        "name": "rockstar:lopez",
+        "stream": false
+      }
+    ]
+  },
+  "klyanus": {
+    "sounds": [
+      {
+        "name": "rockstar:klyanus",
+        "stream": false
+      }
+    ]
+  }
+}

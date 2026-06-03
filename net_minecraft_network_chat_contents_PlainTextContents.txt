@@ -1,0 +1,9 @@
+Class: net.minecraft.network.chat.contents.PlainTextContents
+--- FIELDS ---
+com.mojang.serialization.MapCodec MAP_CODEC
+net.minecraft.network.chat.contents.PlainTextContents EMPTY
+--- METHODS ---
+net.minecraft.network.chat.contents.PlainTextContents create(java.lang.String)
+java.lang.String text()
+com.mojang.datafixers.kinds.App lambda$static$0(com.mojang.serialization.codecs.RecordCodecBuilder$Instance)
+com.mojang.serialization.MapCodec codec()

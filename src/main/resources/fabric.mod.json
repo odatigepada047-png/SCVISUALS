@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "rockstar",
+	"version": "${version}",
+	"name": "Sound Cloud Visuals",
+	"description": "Вспомогательный мод для комфортной игры",
+	"authors": [
+		"ConeTin",
+		"Malecharik",
+		"Jabkov",
+		"Александр"
+	],
+	"contact": {
+		"homepage": "https://rockstar.moscow"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/rockstar/icon.png",
+	"environment": "client",
+	"entrypoints": {},
+	"mixins": [
+		"rockstar.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.6",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	},
+	"accessWidener": "rockstar.accesswidener"
+}

@@ -1,0 +1,188 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	// Add repositories to retrieve artifacts from in here.
+	// You should only use this when depending on other mods because
+	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
+	// for more information about repositories.
+	mavenCentral()
+}
+
+loom {
+	splitEnvironmentSourceSets()
+	accessWidenerPath = file("src/main/resources/rockstar.accesswidener")
+
+	mods {
+		"rockstar" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+afterEvaluate {
+	if (tasks.findByName('runClient')) {
+		tasks.named('runClient') {
+			doFirst {
+				delete fileTree('build/libs') {
+					include '**/*.jar'
+				}
+			}
+			dependsOn tasks.named('classes')
+		}
+	}
+}
+
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	implementation "net.java.dev.jna:jna:5.14.0"
+	implementation "net.java.dev.jna:jna-platform:5.14.0"
+	include "net.java.dev.jna:jna:5.14.0"
+	include "net.java.dev.jna:jna-platform:5.14.0"
+	compileOnly "org.jetbrains:annotations:24.1.0"
+	compileOnly "javax.annotation:javax.annotation-api:1.3.2"
+	compileOnly 'org.projectlombok:lombok:1.18.36'
+	clientCompileOnly 'org.projectlombok:lombok:1.18.36'
+	implementation "ai.catboost:catboost-prediction:1.2.8"
+	implementation "org.nanohttpd:nanohttpd:2.3.1"
+	implementation "com.google.zxing:core:3.5.4"
+	implementation "com.google.zxing:javase:3.5.4"
+	implementation "com.google.code.gson:gson:2.11.0"
+	
+	// MediaPlayerInfo library for music support (from Maven Central)
+	implementation "dev.redstones.mediaplayerinfo:media-player-info:0.1.0"
+	include "dev.redstones.mediaplayerinfo:media-player-info:0.1.0"
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": inputs.properties.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+	// if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+}
+
+jar {
+	inputs.property "archivesName", project.base.archivesName
+
+	from("LICENSE") {
+		rename { "${it}_${inputs.properties.archivesName}"}
+	}
+}
+
+// configure the maven publication
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			artifactId = project.archives_base_name
+			from components.java
+		}
+	}
+
+	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+	repositories {
+		// Add repositories to publish to here.
+		// Notice: This block does NOT have the same function as the block in the top level.
+		// The repositories here will be used for publishing your artifact, not for
+		// retrieving dependencies.
+	}
+}
+
+tasks.register("printMouseMethods", JavaExec) {
+    classpath = sourceSets.client.runtimeClasspath
+    mainClass = 'moscow.rockstar.ReflectTest'
+}
+
+tasks.register("decompileMouseHandler") {
+    doLast {
+        def classLoader = sourceSets.client.runtimeClasspath.collect { it.toURI().toURL() } as URL[]
+        def loader = new java.net.URLClassLoader(classLoader, ClassLoader.systemClassLoader)
+        def cls = loader.loadClass("net.minecraft.client.MouseHandler")
+        println "Successfully loaded MouseHandler"
+        def resourceName = "net/minecraft/client/MouseHandler.class"
+        def stream = loader.getResourceAsStream(resourceName)
+        if (stream == null) {
+            println "Could not find class file resource"
+            return
+        }
+        def reader = new org.objectweb.asm.ClassReader(stream)
+        def node = new org.objectweb.asm.tree.ClassNode()
+        reader.accept(node, 0)
+        for (method in node.methods) {
+            if (method.name.startsWith("getScaled")) {
+                println "Method: ${method.name}${method.desc}"
+                for (instruction in method.instructions) {
+                    if (instruction instanceof org.objectweb.asm.tree.MethodInsnNode) {
+                        println "  invokes: ${instruction.owner}.${instruction.name}${instruction.desc}"
+                    } else if (instruction instanceof org.objectweb.asm.tree.FieldInsnNode) {
+                        println "  field: ${instruction.owner}.${instruction.name} ${instruction.desc}"
+                    } else if (instruction instanceof org.objectweb.asm.tree.VarInsnNode) {
+                        println "  var: opcode=${instruction.opcode} var=${instruction.var}"
+                    } else if (instruction instanceof org.objectweb.asm.tree.IntInsnNode) {
+                        println "  int: operand=${instruction.operand}"
+                    } else if (instruction instanceof org.objectweb.asm.tree.LdcInsnNode) {
+                        println "  ldc: value=${instruction.cst}"
+                    } else if (instruction.opcode >= 0) {
+                        println "  opcode: ${instruction.opcode}"
+                    }
+                }
+            }
+        }
+    }
+}
+
+tasks.register("printRenderPipelines") {
+    doLast {
+        def classLoader = sourceSets.client.runtimeClasspath.collect { it.toURI().toURL() } as URL[]
+        def loader = new java.net.URLClassLoader(classLoader, ClassLoader.systemClassLoader)
+        def resourceName = "net/minecraft/client/renderer/RenderPipelines.class"
+        def stream = loader.getResourceAsStream(resourceName)
+        if (stream == null) {
+            println "Could not find RenderPipelines class file resource"
+            return
+        }
+        def reader = new org.objectweb.asm.ClassReader(stream)
+        def node = new org.objectweb.asm.tree.ClassNode()
+        reader.accept(node, 0)
+        println "Successfully read RenderPipelines via ASM:"
+        for (field in node.fields) {
+            println "Field: ${field.desc} ${field.name}"
+        }
+    }
+}
+
+
+
+
+

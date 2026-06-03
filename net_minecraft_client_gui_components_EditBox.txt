@@ -1,0 +1,90 @@
+Class: net.minecraft.client.gui.components.EditBox
+--- FIELDS ---
+net.minecraft.client.gui.components.WidgetSprites SPRITES
+int BACKWARDS
+int FORWARDS
+int DEFAULT_TEXT_COLOR
+net.minecraft.network.chat.Style DEFAULT_HINT_STYLE
+net.minecraft.network.chat.Style SEARCH_HINT_STYLE
+net.minecraft.client.gui.Font font
+java.lang.String value
+int maxLength
+boolean bordered
+boolean canLoseFocus
+boolean isEditable
+boolean centered
+boolean textShadow
+boolean invertHighlightedTextColor
+int displayPos
+int cursorPos
+int highlightPos
+int textColor
+int textColorUneditable
+java.lang.String suggestion
+java.util.function.Consumer responder
+java.util.List formatters
+net.minecraft.network.chat.Component hint
+net.minecraft.client.gui.components.IMEPreeditOverlay preeditOverlay
+long focusedTime
+int textX
+int textY
+--- METHODS ---
+java.lang.String getValue()
+void setValue(java.lang.String)
+boolean isVisible()
+void setVisible(boolean)
+void deleteText(int, boolean)
+boolean isBordered()
+void onClick(net.minecraft.client.input.MouseButtonEvent, boolean)
+boolean isCentered()
+void setY(int)
+void setFocused(boolean)
+void selectWord(net.minecraft.client.input.MouseButtonEvent)
+void setX(int)
+boolean keyPressed(net.minecraft.client.input.KeyEvent)
+void insertText(java.lang.String)
+boolean charTyped(net.minecraft.client.input.CharacterEvent)
+void moveCursor(int, boolean)
+boolean isEditable()
+void scrollTo(int)
+void onDrag(net.minecraft.client.input.MouseButtonEvent, double, double)
+int getScreenX(int)
+void setHint(net.minecraft.network.chat.Component)
+void onValueChange(java.lang.String)
+boolean canConsumeInput()
+void moveCursorTo(int, boolean)
+void addFormatter(net.minecraft.client.gui.components.EditBox$TextFormatter)
+int getCursorPos(int)
+void updateTextPosition()
+void moveCursorToEnd(boolean)
+java.lang.String getHighlighted()
+int getWordPosition(int)
+int getWordPosition(int, int)
+int getWordPosition(int, int, boolean)
+void moveCursorToStart(boolean)
+void setResponder(java.util.function.Consumer)
+void setHighlightPos(int)
+boolean preeditUpdated(net.minecraft.client.input.PreeditEvent)
+int findClickedPositionInText(net.minecraft.client.input.MouseButtonEvent)
+net.minecraft.network.chat.MutableComponent createNarrationMessage()
+int getInnerWidth()
+void setCursorPosition(int)
+void deleteCharsToPos(int)
+void deleteWords(int)
+void deleteChars(int)
+int getCursorPosition()
+void playDownSound(net.minecraft.client.sounds.SoundManager)
+void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor, int, int, float)
+void setTextColorUneditable(int)
+void setEditable(boolean)
+void setTextColor(int)
+void setCentered(boolean)
+void setCanLoseFocus(boolean)
+void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput)
+void setSuggestion(java.lang.String)
+int getMaxLength()
+void setTextShadow(boolean)
+net.minecraft.util.FormattedCharSequence applyFormat(java.lang.String, int)
+void setBordered(boolean)
+void setMaxLength(int)
+void setInvertHighlightedTextColor(boolean)
