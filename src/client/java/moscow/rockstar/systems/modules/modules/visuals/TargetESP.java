@@ -78,6 +78,9 @@ import moscow.rockstar.utility.math.MathUtility;
 import moscow.rockstar.utility.render.CrystalRenderer;
 import moscow.rockstar.utility.render.Draw3DUtility;
 import moscow.rockstar.utility.render.DrawUtility;
+import net.minecraft.world.entity.player.Player;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.MeshData;
 import moscow.rockstar.utility.render.GLStateSnapshot;
 import moscow.rockstar.utility.render.RenderUtility;
 import com.mojang.blaze3d.vertex.Tesselator;
@@ -150,21 +153,6 @@ extends BaseModule {
             .withDepthStencilState(java.util.Optional.empty())
             .build()
     );
-
-    public static final com.mojang.blaze3d.pipeline.RenderPipeline ADDITIVE_TEXTURED = net.minecraft.client.renderer.RenderPipelines.register(
-        com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED_SNIPPET)
-            .withLocation(moscow.rockstar.Rockstar.id("pipeline/additive_textured"))
-            .withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(com.mojang.blaze3d.pipeline.BlendFunction.LIGHTNING))
-            .build()
-    );
-
-    public static final com.mojang.blaze3d.pipeline.RenderPipeline ADDITIVE_COLOR = net.minecraft.client.renderer.RenderPipelines.register(
-        com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.GUI_SNIPPET)
-            .withLocation(moscow.rockstar.Rockstar.id("pipeline/additive_color"))
-            .withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(com.mojang.blaze3d.pipeline.BlendFunction.LIGHTNING))
-            .build()
-    );
-
     private final EventListener<Render3DEvent> onRender3D = event -> {
         if (!EntityUtility.isInGame()) {
             this.prevTarget = null;
@@ -174,8 +162,18 @@ extends BaseModule {
             return;
         }
         moscow.rockstar.utility.render.ShaderColorHelper.reset();
-        moscow.rockstar.utility.render.TextureBinder.unbind();
-        moscow.rockstar.framework.shader.GlProgram.clearActive();
+        
+        // Check for locked target from ModerUtils first
+        moscow.rockstar.systems.modules.modules.other.ModerUtils moderUtils = 
+            Rockstar.getInstance().getModuleManager().getModule(moscow.rockstar.systems.modules.modules.other.ModerUtils.class);
+        LivingEntity lockedTarget = null;
+        if (moderUtils != null && moderUtils.isEnabled()) {
+            net.minecraft.world.entity.player.Player locked = moderUtils.getLockedTarget();
+            if (locked != null && locked.isAlive()) {
+                lockedTarget = locked;
+            }
+        }
+        
         LivingEntity target = this.getTarget();
         this.animation.setEasing(Easing.FIGMA_EASE_IN_OUT);
         this.animation.update(target != null);
@@ -208,6 +206,12 @@ extends BaseModule {
             }
             org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_CULL_FACE);
             org.lwjgl.opengl.GL11.glDepthMask(false);
+            
+            // Render enlarged head if locked target
+            if (lockedTarget != null && lockedTarget == this.prevTarget && lockedTarget instanceof net.minecraft.world.entity.player.Player) {
+                renderEnlargedHead(ms, (net.minecraft.world.entity.player.Player)lockedTarget, event.getMainCamera());
+            }
+            
             if (this.crystals.isSelected()) {
                 this.drawCrystals(ms, this.prevTarget);
             } else if (this.circles.isSelected()) {
@@ -236,6 +240,99 @@ extends BaseModule {
             ms.popPose();
         }
     };
+    
+    private void renderEnlargedHead(PoseStack ms, net.minecraft.world.entity.player.Player player, Camera camera) {
+        Vec3 renderPos = this.getRenderPos(player);
+        float alpha = Math.max(0.75f, this.animation.getRGB());
+        // Цвет берётся из темы клиента
+        ColorRGBA color = this.getColor();
+
+        TextureBinder.bind(Rockstar.id("textures/bloom.png"));
+        GlProgram.usePositionTexColor();
+
+        // ── параметры столба ──
+        final float beamWidth  = 0.22f;
+        final float beamHeight = 64.0f;
+        final int   segments   = 24;
+        final float segH       = beamHeight / segments;
+
+        // смещение низа луча — чуть выше головы
+        float baseY = player.getBbHeight() + 0.15f;
+
+        Vec3 cam = camera.position();
+        float ox = (float)(renderPos.x - cam.x);
+        float oz = (float)(renderPos.z - cam.z);
+        float oy = (float)(renderPos.y - cam.y);
+
+        // ── рисуем луч: два пересекающихся плоских quad-а (крест) ──
+        for (int pass = 0; pass < 2; pass++) {
+            BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+
+            for (int seg = 0; seg < segments; seg++) {
+                float y0 = baseY + seg       * segH;
+                float y1 = baseY + (seg + 1) * segH;
+
+                // alpha только затухает к верхушке, без пульсации
+                float t0 = (float) seg       / segments;
+                float t1 = (float)(seg + 1)  / segments;
+                float a0 = alpha * (1.0f - t0);
+                float a1 = alpha * (1.0f - t1);
+
+                // ширина чуть сужается к верху
+                float w0 = beamWidth * (1.0f - t0 * 0.6f);
+                float w1 = beamWidth * (1.0f - t1 * 0.6f);
+
+                ColorRGBA c0 = color.withAlpha(a0 * 255.0f);
+                ColorRGBA c1 = color.withAlpha(a1 * 255.0f);
+
+                // uv: плоский сплошной цвет, без scroll-анимации
+                float u0s = 0.0f, u1s = 1.0f;
+                float v0s = 0.0f, v1s = 1.0f;
+
+                org.joml.Matrix4f mat = ms.last().pose();
+
+                if (pass == 0) {
+                    addBeamQuad(builder, mat, ox - w0, oy + y0, oz, ox + w0, oy + y0, oz,
+                                             ox + w1, oy + y1, oz, ox - w1, oy + y1, oz,
+                                             u0s, v0s, u1s, v1s, c0, c1);
+                } else {
+                    addBeamQuad(builder, mat, ox, oy + y0, oz - w0, ox, oy + y0, oz + w0,
+                                             ox, oy + y1, oz + w1, ox, oy + y1, oz - w1,
+                                             u0s, v0s, u1s, v1s, c0, c1);
+                }
+            }
+
+            this.drawTexBuffer(builder);
+        }
+
+        // ── внешнее широкое glow у основания (без пульсации) ──
+        BufferBuilder glowBuf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        float glowSize = 1.4f;
+        ms.pushPose();
+        ms.translate(ox, oy + baseY, oz);
+        ms.mulPose(camera.rotation());
+        DrawUtility.drawImage(ms, glowBuf,
+                -glowSize / 2.0, -glowSize / 2.0, 0.0,
+                glowSize, glowSize,
+                color.withAlpha(alpha * 0.28f * 255.0f));
+        ms.popPose();
+        this.drawTexBuffer(glowBuf);
+    }
+
+    /** Добавляет один quad с вертикальным градиентом alpha (c0 снизу, c1 сверху). */
+    private static void addBeamQuad(
+            BufferBuilder b, org.joml.Matrix4f mat,
+            float x0, float y0, float z0,
+            float x1, float y1, float z1,
+            float x2, float y2, float z2,
+            float x3, float y3, float z3,
+            float u0, float v0, float u1, float v1,
+            ColorRGBA c0, ColorRGBA c1) {
+        b.addVertex(mat, x0, y0, z0).setUv(u0, v0).setColor(c0.getRed(), c0.getGreen(), c0.getBlue(), c0.getAlpha());
+        b.addVertex(mat, x1, y1, z1).setUv(u1, v0).setColor(c0.getRed(), c0.getGreen(), c0.getBlue(), c0.getAlpha());
+        b.addVertex(mat, x2, y2, z2).setUv(u1, v1).setColor(c1.getRed(), c1.getGreen(), c1.getBlue(), c1.getAlpha());
+        b.addVertex(mat, x3, y3, z3).setUv(u0, v1).setColor(c1.getRed(), c1.getGreen(), c1.getBlue(), c1.getAlpha());
+    }
 
     public TargetESP() {
     }
@@ -257,6 +354,18 @@ extends BaseModule {
     }
 
     private LivingEntity getTarget() {
+        // Priority 0: Check locked target from ModerUtils (если дополнение включено)
+        moscow.rockstar.systems.modules.modules.other.ModerUtils moderUtils = 
+            Rockstar.getInstance().getModuleManager().getModule(moscow.rockstar.systems.modules.modules.other.ModerUtils.class);
+        if (moderUtils != null && moderUtils.isEnabled()) {
+            Player lockedTarget = moderUtils.getLockedTarget();
+            if (lockedTarget != null && lockedTarget.isAlive() && !lockedTarget.isDeadOrDying() && lockedTarget != TargetESP.mc.player) {
+                this.targetTimer.reset();
+                return lockedTarget;
+            }
+        }
+        
+        // Priority 1: Main target from TargetManager
         LivingEntity livingEntity2;
         LivingEntity target2;
         Entity target1 = Rockstar.getInstance().getTargetManager().getCurrentTarget();
@@ -266,11 +375,15 @@ extends BaseModule {
             this.targetTimer.reset();
             return mainTarget;
         }
+        
+        // Priority 2: Crosshair pick entity
         Entity entity = TargetESP.mc.crosshairPickEntity;
         if (entity instanceof LivingEntity && entity != TargetESP.mc.player && !(livingEntity2 = (LivingEntity)entity).isDeadOrDying() && livingEntity2.isAlive()) {
             this.targetTimer.reset();
             return livingEntity2;
         }
+        
+        // Priority 3: Keep previous target for 2 seconds
         if (this.prevTarget != null && this.prevTarget != TargetESP.mc.player && !this.prevTarget.isDeadOrDying() && this.prevTarget.isAlive() && !this.targetTimer.finished(2000L)) {
             return this.prevTarget;
         }
@@ -284,32 +397,16 @@ extends BaseModule {
         }
         ms.pushPose();
         RenderUtility.prepareMatrices((PoseStack)ms);
-        GlProgram.clearActive();
+        GlProgram.usePositionColor();
         org.lwjgl.opengl.GL11.glLineWidth((float)3.0f);
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
         ColorRGBA color = this.getColor();
         int a = (int)(255.0f * this.animation.getRGB());
         org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
-        
-        PoseStack.Pose entry = ms.last();
-        Matrix4f matrix = entry.pose();
-        int rgb = color.withAlpha((float)a).getRGB();
-        
         for (Vector3f[] line : lines) {
             Vec3 start = new Vec3((double)line[0].x, (double)line[0].y, (double)line[0].z);
             Vec3 end = new Vec3((double)line[1].x, (double)line[1].y, (double)line[1].z);
-            Vec3 normalized = end.subtract(start).normalize();
-            if (normalized.lengthSqr() < 1.0E-6f) {
-                normalized = new Vec3(0, 1, 0);
-            }
-            builder.addVertex(matrix, (float)start.x, (float)start.y, (float)start.z)
-                   .setColor(rgb)
-                   .setNormal(entry, (float)normalized.x, (float)normalized.y, (float)normalized.z)
-                   .setLineWidth(3.0f);
-            builder.addVertex(matrix, (float)end.x, (float)end.y, (float)end.z)
-                   .setColor(rgb)
-                   .setNormal(entry, (float)normalized.x, (float)normalized.y, (float)normalized.z)
-                   .setLineWidth(3.0f);
+            Draw3DUtility.drawLine((PoseStack)ms, (BufferBuilder)builder, (Vec3)start, (Vec3)end, (ColorRGBA)color.withAlpha((float)a));
         }
         MeshData mesh = builder.build();
         if (mesh != null) {
@@ -407,32 +504,6 @@ extends BaseModule {
         this.drawTexBuffer(bloomBuffer);
     }
 
-    private void addBillboardQuad(Matrix4f matrix, Vector3f right, Vector3f up, BufferBuilder builder, float cx, float cy, float cz, float size, ColorRGBA color) {
-        float half = size / 2.0f;
-        int rgb = color.getRGB();
-        
-        float x0 = cx - right.x * half - up.x * half;
-        float y0 = cy - right.y * half - up.y * half;
-        float z0 = cz - right.z * half - up.z * half;
-        
-        float x1 = cx + right.x * half - up.x * half;
-        float y1 = cy + right.y * half - up.y * half;
-        float z1 = cz + right.z * half - up.z * half;
-        
-        float x2 = cx + right.x * half + up.x * half;
-        float y2 = cy + right.y * half + up.y * half;
-        float z2 = cz + right.z * half + up.z * half;
-        
-        float x3 = cx - right.x * half + up.x * half;
-        float y3 = cy - right.y * half + up.y * half;
-        float z3 = cz - right.z * half + up.z * half;
-        
-        builder.addVertex(matrix, x0, y0, z0).setUv(0.0f, 1.0f).setColor(rgb);
-        builder.addVertex(matrix, x1, y1, z1).setUv(1.0f, 1.0f).setColor(rgb);
-        builder.addVertex(matrix, x2, y2, z2).setUv(1.0f, 0.0f).setColor(rgb);
-        builder.addVertex(matrix, x3, y3, z3).setUv(0.0f, 0.0f).setColor(rgb);
-    }
-
     private void drawEnergy(PoseStack ms, LivingEntity target) {
         Camera camera = TargetESP.mc.gameRenderer.getMainCamera();
         ColorRGBA color = this.getColor();
@@ -441,14 +512,6 @@ extends BaseModule {
         GlProgram.usePositionTexColor();
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         RenderUtility.prepareMatrices((PoseStack)ms, (Vec3)this.getRenderPos(this.prevTarget));
-        Matrix4f matrix = ms.last().pose();
-        
-        Quaternionf rot = camera.rotation();
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        rot.transform(right);
-        rot.transform(up);
-        
         float halfWidth = target.getBbWidth() / 2.0f;
         float height = target.getBbHeight();
         float cornerRadius = (float)((double)halfWidth * Math.sqrt(2.0)) + 0.05f;
@@ -469,9 +532,12 @@ extends BaseModule {
                 }
                 float size = 0.12f;
                 float glowSize = 0.5f;
-                
-                this.addBillboardQuad(matrix, right, up, builder, xPos, yPos, zPos, glowSize, color.withAlpha(color.getAlpha() * alpha * 0.15f));
-                this.addBillboardQuad(matrix, right, up, builder, xPos, yPos, zPos, size, color.withAlpha(color.getAlpha() * alpha));
+                ms.pushPose();
+                ms.translate((double)xPos, (double)yPos, (double)zPos);
+                ms.mulPose(camera.rotation());
+                DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-glowSize / 2.0f), (double)(-glowSize / 2.0f), (double)0.0, (double)glowSize, (double)glowSize, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha * 0.15f));
+                DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-size / 2.0f), (double)(-size / 2.0f), (double)0.0, (double)size, (double)size, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha));
+                ms.popPose();
             }
         }
         this.drawTexBuffer(builder);
@@ -481,28 +547,16 @@ extends BaseModule {
         Camera camera = TargetESP.mc.gameRenderer.getMainCamera();
         ColorRGBA color = this.getColor();
         Identifier id = Rockstar.id((String)"textures/bloom.png");
-        float width = target.getBbWidth() * 1.5f;
+        float width = this.prevTarget.getBbWidth() * 1.5f;
         TextureBinder.bind(id);
         GlProgram.usePositionTexColor();
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        RenderUtility.prepareMatrices((PoseStack)ms, (Vec3)this.getRenderPos(target));
-        Matrix4f matrix = ms.last().pose();
-        
-        Quaternionf rot = camera.rotation();
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        rot.transform(right);
-        rot.transform(up);
-        
+        RenderUtility.prepareMatrices((PoseStack)ms, (Vec3)this.getRenderPos(this.prevTarget));
         float time = this.moving.getRGB() * SPEED_GHOSTS;
         int step = 2;
         int wormTick = 0;
         int wormCD = 0;
         int wormCount = 0;
-        
-        ColorRGBA bigColor = color.withAlpha(color.getAlpha() * this.animation.getRGB() * 0.05f);
-        ColorRGBA smallColor = color.withAlpha(color.getAlpha() * this.animation.getRGB());
-        
         for (int i = 0; i < 360; i += step) {
             float size = 0.13f + 0.005f * (float)wormTick;
             float bigSize = 0.7f + 0.005f * (float)wormTick;
@@ -519,13 +573,12 @@ extends BaseModule {
             float val = Math.max(0.5f, 1.2f - 0.5f * this.animation.getRGB());
             float sin = (float)(MathUtility.sin((double)((float)Math.toRadians((float)i + time * 1.0f))) * (double)width * (double)val);
             float cos = (float)(MathUtility.cos((double)((float)Math.toRadians((float)i + time * 1.0f))) * (double)width * (double)val);
-            
-            float cx = sin;
-            float cy = (float)((target.getBbHeight() / 1.5f) + (target.getBbHeight() / 3.0f) * MathUtility.sin((double)Math.toRadians((float)i / 2.0f + time / 5.0f)));
-            float cz = cos;
-            
-            this.addBillboardQuad(matrix, right, up, builder, cx, cy, cz, bigSize, bigColor);
-            this.addBillboardQuad(matrix, right, up, builder, cx, cy, cz, size, smallColor);
+            ms.pushPose();
+            ms.translate((double)sin, (double)(this.prevTarget.getBbHeight() / 1.5f) + (double)(this.prevTarget.getBbHeight() / 3.0f) * MathUtility.sin((double)Math.toRadians((float)i / 2.0f + time / 5.0f)), (double)cos);
+            ms.mulPose(camera.rotation());
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-bigSize / 2.0f), (double)(-bigSize / 2.0f), (double)(-size / 2.0f), (double)bigSize, (double)bigSize, (ColorRGBA)color.withAlpha(color.getAlpha() * this.animation.getRGB() * 0.05f));
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-size / 2.0f), (double)(-size / 2.0f), (double)(-size / 2.0f), (double)size, (double)size, (ColorRGBA)color.withAlpha(color.getAlpha() * this.animation.getRGB()));
+            ms.popPose();
         }
         this.drawTexBuffer(builder);
     }
@@ -537,11 +590,6 @@ extends BaseModule {
         }
         if (this.soulsXFormatted.isSelected()) {
             this.drawSoulXFormatted(ms, target);
-            return;
-        }
-        if (this.soulsWraith.isSelected()) {
-            this.drawGhosts(ms, target);
-            this.drawSoulCore(ms, target, 0.9f, 0.12f, false);
             return;
         }
         this.drawSoulCore(ms, target, 0.9f, 0.12f, true);
@@ -557,24 +605,18 @@ extends BaseModule {
         if (prepare) {
             RenderUtility.prepareMatrices((PoseStack)ms, (Vec3)this.getRenderPos(target));
         }
-        Matrix4f matrix = ms.last().pose();
-        
-        Quaternionf rot = camera.rotation();
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        rot.transform(right);
-        rot.transform(up);
-        
         float time = this.moving.getRGB();
         float y = target.getBbHeight() * 0.52f;
         float pulse = 0.82f + 0.18f * (float)Math.sin(time * 0.05f * pulseSpeed);
         float coreSize = 0.24f * pulse;
         float coreGlow = 1.15f * pulse;
         float alpha = this.animation.getRGB();
-        
-        this.addBillboardQuad(matrix, right, up, builder, 0.0f, y, 0.0f, coreGlow, color.withAlpha(color.getAlpha() * alpha * 0.28f));
-        this.addBillboardQuad(matrix, right, up, builder, 0.0f, y, 0.0f, coreSize, color.withAlpha(color.getAlpha() * alpha));
-        
+        ms.pushPose();
+        ms.translate(0.0, (double)y, 0.0);
+        ms.mulPose(camera.rotation());
+        DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-coreGlow / 2.0f), (double)(-coreGlow / 2.0f), (double)0.0, (double)coreGlow, (double)coreGlow, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha * 0.28f));
+        DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-coreSize / 2.0f), (double)(-coreSize / 2.0f), (double)0.0, (double)coreSize, (double)coreSize, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha));
+        ms.popPose();
         for (int i = 0; i < 14; ++i) {
             float angle = (float)i * 25.714285f + time * 1.4f;
             float x = (float)Math.cos(Math.toRadians(angle)) * orbitRadius;
@@ -583,12 +625,69 @@ extends BaseModule {
             float size = 0.05f + 0.02f * (float)Math.sin(Math.toRadians((float)i * 40.0f + time));
             float glow = size * 3.6f;
             float orbAlpha = alpha * (0.7f + 0.3f * (float)Math.sin(Math.toRadians((float)i * 31.0f + time * 2.0f)));
-            
-            this.addBillboardQuad(matrix, right, up, builder, x, orbY, z, glow, color.withAlpha(color.getAlpha() * orbAlpha * 0.2f));
-            this.addBillboardQuad(matrix, right, up, builder, x, orbY, z, size, color.withAlpha(color.getAlpha() * orbAlpha));
+            ms.pushPose();
+            ms.translate((double)x, (double)orbY, (double)z);
+            ms.mulPose(camera.rotation());
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-glow / 2.0f), (double)(-glow / 2.0f), (double)0.0, (double)glow, (double)glow, (ColorRGBA)color.withAlpha(color.getAlpha() * orbAlpha * 0.2f));
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-size / 2.0f), (double)(-size / 2.0f), (double)0.0, (double)size, (double)size, (ColorRGBA)color.withAlpha(color.getAlpha() * orbAlpha));
+            ms.popPose();
         }
         this.drawTexBuffer(builder);
     }
+
+    /*
+    private void drawMarker(PoseStack ms, LivingEntity target) {
+        double toCamZ;
+        Camera camera = TargetESP.mc.gameRenderer.getMainCamera();
+        Vec3 targetPos = this.getRenderPos(target);
+        Vec3 cameraPos = camera.position();
+        float halfH = target.getBbHeight() / 2.0f;
+        float halfW = target.getBbWidth() / 2.0f;
+        double bob = Math.sin((double)this.moving.getRGB() * 0.045) * 0.06;
+        double centerX = targetPos.x - cameraPos.x();
+        double centerY = targetPos.y - cameraPos.y() + (double)halfH + bob;
+        double centerZ = targetPos.z - cameraPos.z();
+        double toCamX = cameraPos.x() - targetPos.x;
+        double toCamLen = Math.sqrt(toCamX * toCamX + (toCamZ = cameraPos.z() - targetPos.z) * toCamZ);
+        if (toCamLen > 0.0) {
+            toCamX /= toCamLen;
+            toCamZ /= toCamLen;
+        }
+        double edgeOffset = (double)halfW + 0.02;
+        double edgeX = centerX + toCamX * edgeOffset;
+        double edgeZ = centerZ + toCamZ * edgeOffset;
+        float size = 0.9f * this.animation.getRGB();
+        float glowSize = size * 1.9f;
+        float rotationValue = this.moving.getRGB() * 0.5f;
+        ColorRGBA color = this.getColor();
+        float alpha = this.animation.getRGB() * 0.95f;
+        Identifier markerTexture = Rockstar.id((String)"textures/marker.png");
+        Identifier bloomTexture = Rockstar.id((String)"textures/bloom.png");
+        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
+        TextureBinder.bind(bloomTexture);
+        GlProgram.usePositionTexColor();
+        BufferBuilder bloomBuf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        ms.pushPose();
+        ms.translate(edgeX, centerY, edgeZ);
+        ms.mulPose(camera.rotation());
+        ms.mulPose(Axis.YP.rotationDegrees(rotationValue * 0.4f));
+        DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)bloomBuf, (double)((double)(-glowSize) / 2.0), (double)((double)(-glowSize) / 2.0), (double)0.0, (double)glowSize, (double)glowSize, (ColorRGBA)color.withAlpha(alpha * 0.22f * 255.0f));
+        ms.popPose();
+        this.drawTexBuffer(bloomBuf);
+        TextureBinder.bind(markerTexture);
+        GlProgram.usePositionTexColor();
+        BufferBuilder markerBuf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        ms.pushPose();
+        ms.translate(edgeX, centerY, edgeZ);
+        ms.mulPose(camera.rotation());
+        ms.mulPose(Axis.YP.rotationDegrees(rotationValue));
+        DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)markerBuf, (double)((double)(-size) / 2.0), (double)((double)(-size) / 2.0), (double)0.0, (double)size, (double)size, (ColorRGBA)color.withAlpha(alpha * 255.0f));
+        DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)markerBuf, (double)((double)(-size) / 2.0), (double)((double)(-size) / 2.0), (double)0.0, (double)size, (double)size, (ColorRGBA)color.withAlpha(alpha * 0.25f * 255.0f));
+        ms.popPose();
+        this.drawTexBuffer(markerBuf);
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
+    }
+    */
 
     private void drawCircles(PoseStack ms, LivingEntity target) {
         Camera camera = TargetESP.mc.gameRenderer.getMainCamera();
@@ -604,25 +703,9 @@ extends BaseModule {
         Identifier bloomTexture = Rockstar.id((String)"textures/bloom.png");
         TextureBinder.bind(bloomTexture);
         GlProgram.usePositionTexColor();
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        
-        ms.pushPose();
-        RenderUtility.prepareMatrices((PoseStack)ms, Vec3.ZERO);
-        Matrix4f matrix = ms.last().pose();
-        
-        Quaternionf rot = camera.rotation();
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        rot.transform(right);
-        rot.transform(up);
-        
         int step = 3;
         float size = 0.32f;
         float bigSize = 0.64f;
-        int alpha = (int)(this.animation.getRGB() * 255.0f);
-        ColorRGBA baseColor = color.withAlpha((float)alpha);
-        ColorRGBA bigColor = baseColor.withAlpha((float)alpha * 0.1f);
-        
         for (int i = 0; i < 360; i += step) {
             if ((int)((float)i / 45.0f) % 2 == 0) continue;
             double rad = Math.toRadians((float)i + movingValue);
@@ -631,12 +714,19 @@ extends BaseModule {
             double radAngle = Math.toRadians(movingValue);
             float waveValue = (float)((1.0 - Math.cos(radAngle)) / 2.0);
             float yPos = (float)(entY + (double)target.getBbHeight() * (double)waveValue);
-            
-            this.addBillboardQuad(matrix, right, up, builder, sin, yPos, cos, bigSize, bigColor);
-            this.addBillboardQuad(matrix, right, up, builder, sin, yPos, cos, size, baseColor);
+            ms.pushPose();
+            ms.translate((double)sin, (double)yPos, (double)cos);
+            ms.mulPose(camera.rotation());
+            int alpha = (int)(this.animation.getRGB() * 255.0f);
+            ColorRGBA baseColor = color.withAlpha((float)alpha);
+            BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)buffer, (double)(-bigSize / 2.0f), (double)(-bigSize / 2.0f), (double)0.0, (double)bigSize, (double)bigSize, (ColorRGBA)baseColor.withAlpha((float)alpha * 0.1f));
+            this.drawTexBuffer(buffer);
+            buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)buffer, (double)(-size / 2.0f), (double)(-size / 2.0f), (double)0.0, (double)size, (double)size, (ColorRGBA)baseColor);
+            this.drawTexBuffer(buffer);
+            ms.popPose();
         }
-        ms.popPose();
-        this.drawTexBuffer(builder);
     }
 
     private void drawJelly(PoseStack ms, LivingEntity target) {
@@ -648,14 +738,6 @@ extends BaseModule {
         GlProgram.usePositionTexColor();
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         RenderUtility.prepareMatrices((PoseStack)ms, (Vec3)this.getRenderPos(this.prevTarget));
-        Matrix4f matrix = ms.last().pose();
-        
-        Quaternionf rot = camera.rotation();
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        rot.transform(right);
-        rot.transform(up);
-        
         float halfWidth = target.getBbWidth() / 2.0f;
         float height = target.getBbHeight();
         float time = this.moving.getRGB();
@@ -673,9 +755,12 @@ extends BaseModule {
             float alpha = this.animation.getRGB();
             float size = 0.09f;
             float glowSize = 0.5f;
-            
-            this.addBillboardQuad(matrix, right, up, builder, xPos, yPos, zPos, glowSize, color.withAlpha(color.getAlpha() * alpha * 0.25f));
-            this.addBillboardQuad(matrix, right, up, builder, xPos, yPos, zPos, size, color.withAlpha(color.getAlpha() * alpha * 0.8f));
+            ms.pushPose();
+            ms.translate((double)xPos, (double)yPos, (double)zPos);
+            ms.mulPose(camera.rotation());
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-glowSize / 2.0f), (double)(-glowSize / 2.0f), (double)0.0, (double)glowSize, (double)glowSize, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha * 0.25f));
+            DrawUtility.drawImage((PoseStack)ms, (BufferBuilder)builder, (double)(-size / 2.0f), (double)(-size / 2.0f), (double)0.0, (double)size, (double)size, (ColorRGBA)color.withAlpha(color.getAlpha() * alpha * 0.8f));
+            ms.popPose();
         }
         this.drawTexBuffer(builder);
     }
@@ -746,8 +831,6 @@ extends BaseModule {
     }
 
     private BufferBuilder beginBloomBuffer() {
-        TextureBinder.unbind();
-        GlProgram.clearActive();
         TextureBinder.bind(Rockstar.id("textures/bloom.png"));
         GlProgram.usePositionTexColor();
         return Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
@@ -769,14 +852,9 @@ extends BaseModule {
     private void drawCrystalBuffer(BufferBuilder builder) {
         MeshData mesh = builder.build();
         if (mesh != null) {
-            TextureBinder.unbind();
-            GlProgram.clearActive();
-            try {
-                moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = true;
-                MeshDrawHelper.draw(mesh, ADDITIVE_COLOR);
-            } finally {
-                moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = false;
-            }
+            GlProgram.usePositionColor();
+            // Vertices are already transformed in CrystalRenderer via PoseStack; same path as bloom glow.
+            MeshDrawHelper.drawBuiltMainTarget(mesh);
         }
     }
 
@@ -785,7 +863,7 @@ extends BaseModule {
         if (mesh != null) {
             try {
                 moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = true;
-                MeshDrawHelper.draw(mesh, ADDITIVE_TEXTURED);
+                MeshDrawHelper.drawBuiltMainTarget(mesh);
             } finally {
                 moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = false;
             }
@@ -851,19 +929,17 @@ extends BaseModule {
         RenderUtility.prepareMatrices(ms, renderPos);
         BufferBuilder builder = CrystalRenderer.createBuffer();
         float time = this.moving.getRGB();
-        float orbitSpeed = 0.12f;
+        float orbitSpeed = 0.2f;
         float[][] crystalPositions = new float[X_ORBIT_COUNT][3];
         for (int i = 0; i < X_ORBIT_COUNT; ++i) {
-            float angle = (float)Math.toRadians((float)(i * 90) + time * (i % 2 == 0 ? orbitSpeed : -orbitSpeed));
-            float tilt = (float)Math.toRadians(i % 2 == 0 ? 30.0f : -30.0f);
-            float x = (float)(Math.cos(angle) * width);
-            float z = (float)(Math.sin(angle) * width * Math.cos(tilt));
-            float y = height + (float)(Math.sin(angle) * width * Math.sin(tilt));
-            y += (float)Math.sin(time * 0.04 + (double)i * 1.5) * 0.04f;
-            crystalPositions[i][0] = x;
+            float angle = (float)Math.toRadians(45.0f + 90.0f * (float)i + time * orbitSpeed);
+            float sin = (float)(Math.cos((double)angle) * (double)width);
+            float cos = (float)(Math.sin((double)angle) * (double)width);
+            float y = height + (float)Math.sin((double)time * 0.03 + (double)i * 1.4) * 0.05f;
+            crystalPositions[i][0] = sin;
             crystalPositions[i][1] = y;
-            crystalPositions[i][2] = z;
-            this.renderCrystal(ms, builder, target, x, y, z, size, color.withAlpha(255.0f * alpha), true);
+            crystalPositions[i][2] = cos;
+            this.renderCrystal(ms, builder, target, sin, y, cos, size, color.withAlpha(255.0f * alpha), true);
         }
         this.drawCrystalBuffer(builder);
         BufferBuilder bloomBuffer = this.beginBloomBuffer();
@@ -880,7 +956,7 @@ extends BaseModule {
     public static net.minecraft.client.renderer.rendertype.RenderType getChamsRenderType(Identifier texture) {
         return CHAMS_RENDER_TYPES.computeIfAbsent(texture, t -> {
             net.minecraft.client.renderer.rendertype.RenderSetup setup = net.minecraft.client.renderer.rendertype.RenderSetup.builder(ENTITY_SEE_THROUGH)
-                .withTexture("Sampler0", Rockstar.id("textures/white.png"))
+                .withTexture("Sampler0", t)
                 .useOverlay()
                 .createRenderSetup();
             return net.minecraft.client.renderer.rendertype.RenderType.create("entity_see_through_chams_" + t.getPath().replace('/', '_'), setup);

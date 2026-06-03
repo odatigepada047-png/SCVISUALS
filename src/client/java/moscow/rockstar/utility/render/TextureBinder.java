@@ -19,6 +19,17 @@ public final class TextureBinder implements IMinecraft {
         bindTexture(texture);
     }
 
+    public static void bindLinear(Identifier id) {
+        AbstractTexture texture = mc.getTextureManager().getTexture(id);
+        if (texture != null) {
+            lastBinding = new GpuBinding(
+                    texture.getTextureView(),
+                    RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR)
+            );
+        }
+    }
+
+
     public static void bindTexture(AbstractTexture texture) {
         if (texture != null) {
             lastBinding = new GpuBinding(texture.getTextureView(), texture.getSampler());

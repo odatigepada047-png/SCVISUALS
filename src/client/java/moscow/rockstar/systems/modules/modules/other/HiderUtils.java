@@ -16,6 +16,7 @@ public class HiderUtils extends BaseModule {
     private final BooleanSetting hidePasswords = new BooleanSetting(this, "modules.settings.hider_utils.hide_passwords").enabled(true);
     private final BooleanSetting hideAnarchy = new BooleanSetting(this, "modules.settings.hider_utils.hide_anarchy").enabled(true);
     private final BooleanSetting hidePrivileges = new BooleanSetting(this, "modules.settings.hider_utils.hide_privileges").enabled(true);
+    private final BooleanSetting hideNick = new BooleanSetting(this, "modules.settings.hider_utils.hide_nick").enabled(true);
     private final StringSetting fakeName = new StringSetting(this, "modules.settings.hider_utils.fake_name").text("Player");
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
@@ -52,18 +53,20 @@ public class HiderUtils extends BaseModule {
         }
 
         // 4. Nickname Protect
-        String clientUsername = mc.getUser().getName();
-        String replacement = this.fakeName.getText();
-        if (replacement == null || replacement.isEmpty()) {
-            replacement = "Player";
-        }
-        if (EntityUtility.isInGame() && mc.player != null) {
-            var displayName = mc.player.getDisplayName();
-            if (displayName != null) {
-                text = text.replace(displayName.getString(), replacement);
+        if (this.hideNick.isEnabled()) {
+            String clientUsername = mc.getUser().getName();
+            String replacement = this.fakeName.getText();
+            if (replacement == null || replacement.isEmpty()) {
+                replacement = "Player";
             }
+            if (EntityUtility.isInGame() && mc.player != null) {
+                var displayName = mc.player.getDisplayName();
+                if (displayName != null) {
+                    text = text.replace(displayName.getString(), replacement);
+                }
+            }
+            text = text.replace(clientUsername, replacement);
         }
-        text = text.replace(clientUsername, replacement);
 
         return text;
     }
@@ -118,6 +121,10 @@ public class HiderUtils extends BaseModule {
         return this.hidePrivileges;
     }
 
+    public BooleanSetting getHideNick() {
+        return this.hideNick;
+    }
+
     public StringSetting getFakeName() {
         return this.fakeName;
     }
@@ -132,7 +139,7 @@ public class HiderUtils extends BaseModule {
         String plain = component.getString();
         boolean hasPriv = hider.getHidePrivileges().isEnabled() && (plain.toLowerCase().contains("ранг") || plain.toLowerCase().contains("ранк") || plain.toLowerCase().contains("rank"));
         boolean hasAnarchy = hider.getHideAnarchy().isEnabled() && (plain.toLowerCase().contains("анархия") || plain.toLowerCase().contains("anarchy") || plain.toLowerCase().contains("гриф") || plain.toLowerCase().contains("grief") || plain.toLowerCase().contains("mst"));
-        boolean hasFakeName = moscow.rockstar.utility.game.EntityUtility.isInGame() && hider.mc.player != null && plain.contains(hider.mc.getUser().getName());
+        boolean hasFakeName = hider.getHideNick().isEnabled() && moscow.rockstar.utility.game.EntityUtility.isInGame() && hider.mc.player != null && plain.contains(hider.mc.getUser().getName());
 
         if (!hasPriv && !hasAnarchy && !hasFakeName) {
             return component;
@@ -189,16 +196,18 @@ public class HiderUtils extends BaseModule {
                     }
                 }
 
-                String clientUsername = hider.mc.getUser().getName();
-                String replacement = hider.getFakeName().getText();
-                if (replacement == null || replacement.isEmpty()) {
-                    replacement = "Player";
-                }
-                newText = newText.replace(clientUsername, replacement);
-                if (moscow.rockstar.utility.game.EntityUtility.isInGame() && hider.mc.player != null) {
-                    var displayName = hider.mc.player.getDisplayName();
-                    if (displayName != null) {
-                        newText = newText.replace(displayName.getString(), replacement);
+                if (hider.getHideNick().isEnabled()) {
+                    String clientUsername = hider.mc.getUser().getName();
+                    String replacement = hider.getFakeName().getText();
+                    if (replacement == null || replacement.isEmpty()) {
+                        replacement = "Player";
+                    }
+                    newText = newText.replace(clientUsername, replacement);
+                    if (moscow.rockstar.utility.game.EntityUtility.isInGame() && hider.mc.player != null) {
+                        var displayName = hider.mc.player.getDisplayName();
+                        if (displayName != null) {
+                            newText = newText.replace(displayName.getString(), replacement);
+                        }
                     }
                 }
 

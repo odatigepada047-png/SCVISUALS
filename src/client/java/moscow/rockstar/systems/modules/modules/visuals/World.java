@@ -1,39 +1,4 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.mojang.blaze3d.platform.GlStateManager$DstFactor
- *  com.mojang.blaze3d.platform.GlStateManager$SrcFactor
- *  com.mojang.blaze3d.systems.RenderSystem
- *  net.minecraft.client.gl.ShaderProgramKey
- *  net.minecraft.client.gl.ShaderProgramKeys
- *  net.minecraft.client.renderer.BufferBuilder
- *  net.minecraft.client.renderer.BufferRenderer
- *  net.minecraft.client.renderer.MeshData
- *  net.minecraft.client.renderer.Camera
- *  net.minecraft.client.renderer.VertexFormat$DrawMode
- *  net.minecraft.client.renderer.DefaultVertexFormat
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.mojang.blaze3d.platform.GlStateManager$DstFactor
- *  com.mojang.blaze3d.platform.GlStateManager$SrcFactor
- *  com.mojang.blaze3d.systems.RenderSystem
- *  net.minecraft.client.gl.ShaderProgramKey
- *  net.minecraft.client.gl.ShaderProgramKeys
- *  net.minecraft.client.renderer.BufferBuilder
- *  net.minecraft.client.renderer.BufferRenderer
- *  net.minecraft.client.renderer.MeshData
- *  net.minecraft.client.renderer.Camera
- *  net.minecraft.client.renderer.VertexFormat$DrawMode
- *  net.minecraft.client.renderer.DefaultVertexFormat
- *  net.minecraft.client.util.math.PoseStack
- *  net.minecraft.util.Identifier
- *  net.minecraft.util.math.AABB
- *  net.minecraft.util.math.Vec3
- *  org.joml.Quaternionf
- */
+
 package moscow.rockstar.systems.modules.modules.visuals;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -63,157 +28,156 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
-@ModuleInfo(name="World", category=ModuleCategory.VISUALS, desc="\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u044b\u0435 \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u043c\u0438\u0440\u0430")
-public class World
-extends BaseModule {
-    private final List<Particle> particles = new ArrayList<Particle>();
+@ModuleInfo(name="World", category=ModuleCategory.VISUALS, desc="Визуальные дополнения мира")
+public class World extends BaseModule {
+    private final List<Particle> particles = new ArrayList<>();
     private final BooleanSetting syncWithTheme = new BooleanSetting(this, "modules.settings.sync_with_theme").enable();
     private final ColorSetting color = new ColorSetting(this, "color", () -> this.syncWithTheme.isEnabled()).color(Colors.getAccentColor());
-    
+
     public ColorRGBA getColor() {
         return this.syncWithTheme.isEnabled() ? Colors.getAccentColor() : this.color.getColor();
     }
+
     private final EventListener<Render3DEvent> on3DRender = event -> {
-        if (RenderSystem.outputColorTextureOverride != null) {
+        if (RenderSystem.outputColorTextureOverride != null || this.particles.isEmpty()) {
             return;
         }
         GLStateSnapshot glState = GLStateSnapshot.capture();
-        
+
         try {
             PoseStack ms = event.pose();
             Camera camera = World.mc.gameRenderer.getMainCamera();
             Vec3 cameraPos = camera.position();
-            
-            GL11.glEnable((int)3042);
-            GL11.glBlendFunc((int)770, (int)1);
-            GL11.glEnable((int)2929);
-            GL11.glDisable((int)2884);
-            GL11.glDepthMask((boolean)false);
-            
+            float partialTicks = event.getGameTimeDeltaPartialTick();
+
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+            GL11.glDisable(GL11.GL_CULL_FACE);
+            GL11.glDepthMask(false);
+
+            // 1. РЕНДЕР ТЕКСТУР БЛУМА
             Identifier id = Rockstar.id("textures/bloom.png");
             TextureBinder.bind(id);
             GlProgram.usePositionTexColor();
-            
+
             BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             for (Particle particle : this.particles) {
-                Vec3 pos = Utils.getInterpolatedPos(particle.prev, particle.pos, event.getGameTimeDeltaPartialTick());
+                Vec3 pos = Utils.getInterpolatedPos(particle.prev, particle.pos, partialTicks);
                 float bigSize = 4.0f * particle.size;
+
                 ms.pushPose();
                 RenderUtility.prepareMatrices(ms, pos);
                 ms.mulPose(camera.rotation());
-                DrawUtility.drawImage(ms, builder, (double)(-bigSize / 2.0f), (double)(-bigSize / 2.0f), 0.0, (double)bigSize, (double)bigSize, this.getColor().withAlpha(255.0f * particle.alpha.getRGB() * 0.4f));
+                DrawUtility.drawImage(ms, builder, -bigSize / 2.0f, -bigSize / 2.0f, 0.0, bigSize, bigSize, this.getColor().withAlpha(255.0f * particle.alpha.getRGB() * 0.3f));
                 ms.popPose();
             }
             MeshData builtTexBuffer = builder.build();
             if (builtTexBuffer != null) {
                 MeshDrawHelper.drawBuilt(builtTexBuffer);
             }
-            
+
             TextureBinder.unbind();
+
+            // 2. РЕНДЕР КУБОВ (Переведено на ПОЛУПРОЗРАЧНЫЕ КВАДРАТЫ вместо линий, чтобы убрать баг)
             GlProgram.usePositionColor();
-            
-            BufferBuilder linesBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
+            BufferBuilder cubeBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+
             for (Particle particle : this.particles) {
                 particle.alpha.update(!particle.timer.finished(particle.liveTicks));
-                Vec3 pos = Utils.getInterpolatedPos(particle.prev, particle.pos, event.getGameTimeDeltaPartialTick());
-                Vec3 rot = Utils.getInterpolatedPos(particle.prevRot, particle.rotate, event.getGameTimeDeltaPartialTick());
+
+                Vec3 pos = Utils.getInterpolatedPos(particle.prev, particle.pos, partialTicks);
+                Vec3 rot = Utils.getInterpolatedPos(particle.prevRot, particle.rotate, partialTicks);
+
                 ms.pushPose();
-                ms.translate(pos.add(-cameraPos.x, -cameraPos.y, -cameraPos.z));
+                ms.translate(pos.x - cameraPos.x, pos.y - cameraPos.y, pos.z - cameraPos.z);
                 ms.mulPose(new Quaternionf().rotationXYZ((float)rot.x, (float)rot.y, (float)rot.z));
                 ms.scale(particle.size, particle.size, particle.size);
-                
-                ColorRGBA diagColor = this.getColor().withAlpha(255.0f * particle.alpha.getRGB() * 0.4f);
-                ColorRGBA outlineColor = this.getColor().withAlpha(205.0f * particle.alpha.getRGB());
-                this.drawParticleBox(ms, linesBuffer, 1.0f, outlineColor, diagColor);
-                
+
+                ColorRGBA cubeColor = this.getColor().withAlpha(255.0f * particle.alpha.getRGB() * 0.25f);
+
+                this.drawSolidCube(ms, cubeBuffer, 1.0f, cubeColor.getRGB());
+
                 ms.popPose();
             }
-            MeshData builtLinesBuffer = linesBuffer.build();
-            if (builtLinesBuffer != null) {
-                MeshDrawHelper.drawBuilt(builtLinesBuffer);
+
+            MeshData builtCubeBuffer = cubeBuffer.build();
+            if (builtCubeBuffer != null) {
+                MeshDrawHelper.drawBuilt(builtCubeBuffer);
             }
+        } catch (Exception e) {
+            // Игнорируем ошибки интерполяции при резкой смене мира
         } finally {
             GlProgram.clearActive();
             glState.restore();
         }
     };
 
-    private void drawParticleBox(PoseStack ms, BufferBuilder buffer, float size, ColorRGBA boxColor, ColorRGBA diagColor) {
+    private void drawSolidCube(PoseStack ms, BufferBuilder buffer, float size, int rgb) {
         float min = -0.5f * size;
         float max = 0.5f * size;
-        
-        Vec3[] boxVertices = {
-            new Vec3(min, min, min), new Vec3(max, min, min),
-            new Vec3(max, min, min), new Vec3(max, min, max),
-            new Vec3(max, min, max), new Vec3(min, min, max),
-            new Vec3(min, min, max), new Vec3(min, min, min),
-            
-            new Vec3(min, max, min), new Vec3(max, max, min),
-            new Vec3(max, max, min), new Vec3(max, max, max),
-            new Vec3(max, max, max), new Vec3(min, max, max),
-            new Vec3(min, max, max), new Vec3(min, max, min),
-            
-            new Vec3(min, min, min), new Vec3(min, max, min),
-            new Vec3(max, min, min), new Vec3(max, max, min),
-            new Vec3(max, min, max), new Vec3(max, max, max),
-            new Vec3(min, min, max), new Vec3(min, max, max)
-        };
-        
-        Vec3[] diagVertices = {
-            new Vec3(min, min, min), new Vec3(max, max, max),
-            new Vec3(max, min, min), new Vec3(min, max, max),
-            new Vec3(min, min, max), new Vec3(max, max, min),
-            new Vec3(max, min, max), new Vec3(min, max, min)
-        };
-        
-        PoseStack.Pose entry = ms.last();
-        Matrix4f matrix = entry.pose();
-        
-        int boxRgb = boxColor.getRGB();
-        for (int i = 0; i < boxVertices.length; i += 2) {
-            Vec3 start = boxVertices[i];
-            Vec3 end = boxVertices[i + 1];
-            Vec3 normal = end.subtract(start).normalize();
-            buffer.addVertex(matrix, (float)start.x, (float)start.y, (float)start.z)
-                  .setColor(boxRgb)
-                  .setNormal(entry, (float)normal.x, (float)normal.y, (float)normal.z)
-                  .setLineWidth(1.0f);
-            buffer.addVertex(matrix, (float)end.x, (float)end.y, (float)end.z)
-                  .setColor(boxRgb)
-                  .setNormal(entry, (float)normal.x, (float)normal.y, (float)normal.z)
-                  .setLineWidth(1.0f);
-        }
-        
-        int diagRgb = diagColor.getRGB();
-        for (int i = 0; i < diagVertices.length; i += 2) {
-            Vec3 start = diagVertices[i];
-            Vec3 end = diagVertices[i + 1];
-            Vec3 normal = end.subtract(start).normalize();
-            buffer.addVertex(matrix, (float)start.x, (float)start.y, (float)start.z)
-                  .setColor(diagRgb)
-                  .setNormal(entry, (float)normal.x, (float)normal.y, (float)normal.z)
-                  .setLineWidth(1.0f);
-            buffer.addVertex(matrix, (float)end.x, (float)end.y, (float)end.z)
-                  .setColor(diagRgb)
-                  .setNormal(entry, (float)normal.x, (float)normal.y, (float)normal.z)
-                  .setLineWidth(1.0f);
-        }
+
+        Matrix4f matrix = ms.last().pose();
+
+        // Передняя грань
+        buffer.addVertex(matrix, min, min, max).setColor(rgb);
+        buffer.addVertex(matrix, max, min, max).setColor(rgb);
+        buffer.addVertex(matrix, max, max, max).setColor(rgb);
+        buffer.addVertex(matrix, min, max, max).setColor(rgb);
+
+        // Задняя грань
+        buffer.addVertex(matrix, min, min, min).setColor(rgb);
+        buffer.addVertex(matrix, min, max, min).setColor(rgb);
+        buffer.addVertex(matrix, max, max, min).setColor(rgb);
+        buffer.addVertex(matrix, max, min, min).setColor(rgb);
+
+        // Верхняя грань
+        buffer.addVertex(matrix, min, max, min).setColor(rgb);
+        buffer.addVertex(matrix, min, max, max).setColor(rgb);
+        buffer.addVertex(matrix, max, max, max).setColor(rgb);
+        buffer.addVertex(matrix, max, max, min).setColor(rgb);
+
+        // Нижняя грань
+        buffer.addVertex(matrix, min, min, min).setColor(rgb);
+        buffer.addVertex(matrix, max, min, min).setColor(rgb);
+        buffer.addVertex(matrix, max, min, max).setColor(rgb);
+        buffer.addVertex(matrix, min, min, max).setColor(rgb);
+
+        // Правая грань
+        buffer.addVertex(matrix, max, min, min).setColor(rgb);
+        buffer.addVertex(matrix, max, max, min).setColor(rgb);
+        buffer.addVertex(matrix, max, max, max).setColor(rgb);
+        buffer.addVertex(matrix, max, min, max).setColor(rgb);
+
+        // Левая грань
+        buffer.addVertex(matrix, min, min, min).setColor(rgb);
+        buffer.addVertex(matrix, min, min, max).setColor(rgb);
+        buffer.addVertex(matrix, min, max, max).setColor(rgb);
+        buffer.addVertex(matrix, min, max, min).setColor(rgb);
     }
 
     @Override
     public void tick() {
         this.particles.removeIf(particle -> particle.alpha.getRGB() == 0.0f && particle.timer.finished(particle.liveTicks));
-        for (Particle particle2 : this.particles) {
-            particle2.tick();
+
+        for (Particle particle : this.particles) {
+            particle.tick();
         }
-        if (this.particles.size() < 100) {
-        this.particles.add(new Particle(World.mc.player.position().add((double)MathUtility.random(-20.0, 20.0), (double)MathUtility.random(0.0, 5.0), (double)MathUtility.random(-20.0, 20.0)), Vec3.ZERO, new Vec3((double)MathUtility.random(-1.0, 1.0), (double)MathUtility.random(0.0, 2.0), (double)MathUtility.random(-1.0, 1.0)), new Vec3((double)MathUtility.random(-1.0, 1.0), (double)MathUtility.random(-1.0, 1.0), (double)MathUtility.random(-1.0, 1.0)), (long)MathUtility.random(1500.0, 4500.0), MathUtility.random(0.1f, 0.3f)));
+
+        if (this.particles.size() < 100 && World.mc.player != null) {
+            this.particles.add(new Particle(
+                    World.mc.player.position().add(MathUtility.random(-20.0, 20.0), MathUtility.random(0.0, 5.0), MathUtility.random(-20.0, 20.0)),
+                    Vec3.ZERO,
+                    new Vec3(MathUtility.random(-1.0, 1.0), MathUtility.random(0.0, 2.0), MathUtility.random(-1.0, 1.0)),
+                    new Vec3(MathUtility.random(-1.0, 1.0), MathUtility.random(-1.0, 1.0), MathUtility.random(-1.0, 1.0)),
+                    (long) MathUtility.random(1500.0, 4500.0),
+                    MathUtility.random(0.1f, 0.3f)
+            ));
         }
     }
 
@@ -251,6 +215,4 @@ extends BaseModule {
         }
     }
 }
-
-
 

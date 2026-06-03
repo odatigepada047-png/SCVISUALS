@@ -254,7 +254,7 @@ public class Cooldowns extends HudList {
             float timeX = this.x + this.width - 5.0f * entry.animation.getRGB();
             float timeY = this.y + offset + off + GuiUtility.getMiddleOfBox(font.height(), 18.0f);
 
-            if (minutes > 0) {
+            if (totalSeconds > 60) {
                 // mm:ss формат
                 String minutesAndSeparator = String.format("%d:", minutes);
                 String timeStr = minutesAndSeparator + String.format("%02d", seconds);
@@ -269,12 +269,17 @@ public class Cooldowns extends HudList {
                 entry.timeAnimation.render(context);
             } else {
                 // Только секунды — быстрый счёт для коротких кулдаунов
-                float totalWidth = font.width(String.valueOf(seconds));
-
                 entry.timeAnimation.settings(true, timeColor);
-                entry.timeAnimation.update(seconds);
+                entry.timeAnimation.update(totalSeconds);
+
+                String sText = " s";
+                float sWidth = font.width(sText);
+                float numWidth = entry.timeAnimation.getWidth();
+                float totalWidth = numWidth + sWidth;
+
                 entry.timeAnimation.pos(timeX - totalWidth, timeY);
                 entry.timeAnimation.render(context);
+                context.drawText(font, sText, timeX - sWidth, timeY, timeColor);
             }
 
             offset += 18.0f * entry.animation.getRGB();

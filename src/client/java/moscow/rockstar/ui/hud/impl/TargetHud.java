@@ -317,6 +317,17 @@ public class TargetHud extends HudElement {
     }
 
     private LivingEntity getTarget() {
+        // Priority 0: Check locked target from ModerUtils
+        moscow.rockstar.systems.modules.modules.other.ModerUtils moderUtils = 
+            Rockstar.getInstance().getModuleManager().getModule(moscow.rockstar.systems.modules.modules.other.ModerUtils.class);
+        if (moderUtils != null && moderUtils.isEnabled()) {
+            net.minecraft.world.entity.player.Player lockedTarget = moderUtils.getLockedTarget();
+            if (lockedTarget != null && lockedTarget.isAlive()) {
+                this.targetTimer.reset();
+                return lockedTarget;
+            }
+        }
+        
         if (!EntityUtility.isInGame()) {
             this.target = null;
             return null;

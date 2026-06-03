@@ -190,6 +190,13 @@ public class CustomDrawContext
         DrawUtility.drawTexture(this.pose(), identifier, x, y, width, height, textureColor);
     }
 
+    public void drawTextureLinear(Identifier identifier, float x, float y, float width, float height,
+            ColorRGBA textureColor) {
+        DrawUtility.drawTextureLinear(copyStack(this.pose()), identifier, x, y, width, height, textureColor);
+    }
+
+
+
     public void drawSprite(CustomSprite sprite, float x, float y, float width, float height, ColorRGBA textureColor) {
         DrawUtility.drawSprite(this.pose(), sprite, x, y, width, height, textureColor);
     }

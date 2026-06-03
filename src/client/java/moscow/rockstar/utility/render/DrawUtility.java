@@ -411,6 +411,35 @@ IWindow {
         matrices.popPose();
     }
 
+    public static void drawTextureLinear(PoseStack matrices, Identifier identifier, float x, float y, float width, float height, ColorRGBA textureColor) {
+        Batching batching = Batching.getActive();
+        if (batching instanceof IconBatching iconBatching) {
+            BufferBuilder builder = iconBatching.getBuilder();
+            Matrix4f matrix4f = matrices.last().pose();
+            TextureBinder.bindLinear(identifier);
+            builder.addVertex(matrix4f, x, y, 0.0f).setUv(0.0f, 0.0f).setColor(textureColor.getRGB());
+            builder.addVertex(matrix4f, x, y + height, 0.0f).setUv(0.0f, 1.0f).setColor(textureColor.getRGB());
+            builder.addVertex(matrix4f, x + width, y + height, 0.0f).setUv(1.0f, 1.0f).setColor(textureColor.getRGB());
+            builder.addVertex(matrix4f, x + width, y, 0.0f).setUv(1.0f, 0.0f).setColor(textureColor.getRGB());
+            return;
+        }
+        matrices.pushPose();
+        Matrix4f matrix4f = matrices.last().pose();
+        GlProgram.usePositionTexColor();
+        TextureBinder.bindLinear(identifier);
+        DrawUtility.drawSetup();
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        builder.addVertex(matrix4f, x, y, 0.0f).setUv(0.0f, 0.0f).setColor(textureColor.getRGB());
+        builder.addVertex(matrix4f, x, y + height, 0.0f).setUv(0.0f, 1.0f).setColor(textureColor.getRGB());
+        builder.addVertex(matrix4f, x + width, y + height, 0.0f).setUv(1.0f, 1.0f).setColor(textureColor.getRGB());
+        builder.addVertex(matrix4f, x + width, y, 0.0f).setUv(1.0f, 0.0f).setColor(textureColor.getRGB());
+        MeshDrawHelper.drawBuilt(builder.build());
+        DrawUtility.drawEnd();
+        TextureBinder.unbind();
+        matrices.popPose();
+    }
+
+
     public static void drawTexture(PoseStack matrices, Identifier identifier, float x, float y, float width, float height, float u1, float u2, float v1, float v2, ColorRGBA clor) {
         Batching batching = Batching.getActive();
         if (batching instanceof IconBatching iconBatching) {
