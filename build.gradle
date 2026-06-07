@@ -182,6 +182,51 @@ tasks.register("printRenderPipelines") {
     }
 }
 
+tasks.register("inspectEntityClasses") {
+    doLast {
+        def classLoader = sourceSets.client.runtimeClasspath.collect { it.toURI().toURL() } as URL[]
+        def loader = new java.net.URLClassLoader(classLoader, ClassLoader.systemClassLoader)
+        
+        // Inspect EntityRenderer
+        def stream = loader.getResourceAsStream("net/minecraft/client/renderer/entity/EntityRenderer.class")
+        if (stream != null) {
+            def reader = new org.objectweb.asm.ClassReader(stream)
+            def node = new org.objectweb.asm.tree.ClassNode()
+            reader.accept(node, 0)
+            println "=== EntityRenderer Methods ==="
+            for (method in node.methods) {
+                if (method.name.toLowerCase().contains("shadow") || method.name.toLowerCase().contains("render") || method.name.toLowerCase().contains("show")) {
+                    println "Method: ${method.name} ${method.desc}"
+                }
+            }
+        }
+        
+        // Inspect EntityRenderDispatcher
+        stream = loader.getResourceAsStream("net/minecraft/client/renderer/entity/EntityRenderDispatcher.class")
+        if (stream != null) {
+            def reader = new org.objectweb.asm.ClassReader(stream)
+            def node = new org.objectweb.asm.tree.ClassNode()
+            reader.accept(node, 0)
+            println "=== EntityRenderDispatcher Methods ==="
+            for (method in node.methods) {
+                if (method.name.toLowerCase().contains("shadow") || method.name.toLowerCase().contains("render")) {
+                    println "Method: ${method.name} ${method.desc}"
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 

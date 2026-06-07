@@ -47,10 +47,24 @@ implements IMinecraft {
         ItemContainerContents container = (ItemContainerContents)s.get(DataComponents.CONTAINER);
         if (container == null) {
             BundleContents container1 = (BundleContents)s.get(DataComponents.BUNDLE_CONTENTS);
-            if (container1 == null) {
+            if (container1 != null) {
+                container1.itemCopyStream().forEach(items::add);
                 return items;
             }
-            container1.itemCopyStream().forEach(items::add);
+            CompoundTag nbt = ItemUtility.getNBT(s);
+            if (nbt != null && mc.level != null) {
+                nbt.getCompound("BlockEntityTag").ifPresent(blockEntityTag -> {
+                    blockEntityTag.getList("Items").ifPresent(list -> {
+                        net.minecraft.resources.RegistryOps<net.minecraft.nbt.Tag> ops = 
+                            net.minecraft.resources.RegistryOps.create(net.minecraft.nbt.NbtOps.INSTANCE, mc.level.registryAccess());
+                        for (int i = 0; i < list.size(); i++) {
+                            list.getCompound(i).ifPresent(itemTag -> {
+                                ItemStack.CODEC.parse(ops, itemTag).result().ifPresent(items::add);
+                            });
+                        }
+                    });
+                });
+            }
             return items;
         }
         container.nonEmptyItemCopyStream().forEach(items::add);

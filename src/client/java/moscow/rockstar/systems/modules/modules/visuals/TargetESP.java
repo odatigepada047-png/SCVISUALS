@@ -89,6 +89,7 @@ import net.minecraft.world.entity.player.Player;
 import moscow.rockstar.utility.time.Timer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -297,11 +298,11 @@ extends BaseModule {
             return mainTarget;
         }
         Entity entity = TargetESP.mc.crosshairPickEntity;
-        if (entity instanceof LivingEntity && entity != TargetESP.mc.player && !(livingEntity2 = (LivingEntity)entity).isDeadOrDying() && livingEntity2.isAlive()) {
+        if (entity instanceof LivingEntity && !(entity instanceof ArmorStand) && entity != TargetESP.mc.player && !(livingEntity2 = (LivingEntity)entity).isDeadOrDying() && livingEntity2.isAlive()) {
             this.targetTimer.reset();
             return livingEntity2;
         }
-        if (this.prevTarget != null && this.prevTarget != TargetESP.mc.player && !this.prevTarget.isDeadOrDying() && this.prevTarget.isAlive() && !this.targetTimer.finished(2000L)) {
+        if (this.prevTarget != null && !(this.prevTarget instanceof ArmorStand) && this.prevTarget != TargetESP.mc.player && !this.prevTarget.isDeadOrDying() && this.prevTarget.isAlive() && !this.targetTimer.finished(2000L)) {
             return this.prevTarget;
         }
         return null;
@@ -316,7 +317,7 @@ extends BaseModule {
         RenderUtility.prepareMatrices((PoseStack)ms);
         GlProgram.clearActive();
         org.lwjgl.opengl.GL11.glLineWidth((float)3.0f);
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
         ColorRGBA color = this.getColor();
         int a = (int)(255.0f * this.animation.getRGB());
         org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
@@ -1011,7 +1012,7 @@ extends BaseModule {
         org.lwjgl.opengl.GL11.glLineWidth(2.0f);
         
         BufferBuilder builder = Tesselator.getInstance().begin(
-            VertexFormat.Mode.DEBUG_LINE_STRIP, 
+            VertexFormat.Mode.LINES, 
             DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH
         );
         
@@ -1021,15 +1022,24 @@ extends BaseModule {
         int segments = 64;
         int argb = color.getRGB();
         
-        for (int i = 0; i <= segments; i++) {
+        float prevX = (float) orbitRadius;
+        float prevZ = 0.0f;
+        for (int i = 1; i <= segments; i++) {
             float angle = (float) (i * 2.0 * Math.PI / segments);
             float x = (float) (Math.cos(angle) * orbitRadius);
             float z = (float) (Math.sin(angle) * orbitRadius);
             
+            builder.addVertex(matrix, prevX, yOffset, prevZ)
+                   .setColor(argb)
+                   .setNormal(entry, 0.0f, 1.0f, 0.0f)
+                   .setLineWidth(2.0f);
             builder.addVertex(matrix, x, yOffset, z)
                    .setColor(argb)
                    .setNormal(entry, 0.0f, 1.0f, 0.0f)
                    .setLineWidth(2.0f);
+            
+            prevX = x;
+            prevZ = z;
         }
         
         MeshData mesh = builder.build();

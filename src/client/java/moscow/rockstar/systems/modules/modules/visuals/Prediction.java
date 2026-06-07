@@ -27,7 +27,6 @@ import moscow.rockstar.utility.colors.Colors;
 import moscow.rockstar.utility.game.PotionUtility;
 import moscow.rockstar.utility.game.TextUtility;
 import moscow.rockstar.utility.inventory.EnchantmentUtility;
-import moscow.rockstar.utility.render.Draw3DUtility;
 import moscow.rockstar.utility.render.DrawUtility;
 import moscow.rockstar.utility.render.GLStateSnapshot;
 import moscow.rockstar.utility.render.RenderUtility;
@@ -84,6 +83,17 @@ import net.minecraft.util.Mth;
 
 @ModuleInfo(name="Prediction", category=ModuleCategory.VISUALS)
 public class Prediction extends BaseModule {
+    public static final com.mojang.blaze3d.pipeline.RenderPipeline PREDICTION_LINES = net.minecraft.client.renderer.RenderPipelines.register(
+        com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.LINES_SNIPPET)
+            .withLocation(moscow.rockstar.Rockstar.id("pipeline/prediction_lines"))
+            .build()
+    );
+    public static final com.mojang.blaze3d.pipeline.RenderPipeline PREDICTION_LINES_THROUGH = net.minecraft.client.renderer.RenderPipelines.register(
+        com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.LINES_SNIPPET)
+            .withLocation(moscow.rockstar.Rockstar.id("pipeline/prediction_lines_through"))
+            .withDepthStencilState(java.util.Optional.empty())
+            .build()
+    );
     private static final double MIN_SEGMENT_DISTANCE_SQR = 0.0025;
     private static final double MIN_CAMERA_DISTANCE_SQR = 1.44;
     private static final double DUPLICATE_START_DISTANCE_SQR = 0.04;
@@ -95,15 +105,20 @@ public class Prediction extends BaseModule {
     private final List<Predicted> predicted = new ArrayList<>();
     private final List<Landed> landed = new ArrayList<>();
     private final List<Vec3> smoothedLandedPositions = new ArrayList<>();
+    private static final double LOOK_REACH = 256.0;
     private final SelectSetting entities = new SelectSetting(this, "modules.settings.prediction.entities");
     private final ModeSetting renderMode = new ModeSetting(this, "modules.settings.prediction.render_mode");
     private final ModeSetting.Value defaultMode = new ModeSetting.Value(this.renderMode, "modules.settings.prediction.render_mode.default");
     private final ModeSetting.Value glowMode = new ModeSetting.Value(this.renderMode, "modules.settings.prediction.render_mode.glow").select();
+    private final ModeSetting hitboxStyle = new ModeSetting(this, "modules.settings.prediction.hitbox_style");
+    private final ModeSetting.Value gradientHitbox = new ModeSetting.Value(this.hitboxStyle, "modules.settings.prediction.hitbox_style.gradient").select();
+    private final ModeSetting.Value outlineHitbox = new ModeSetting.Value(this.hitboxStyle, "modules.settings.prediction.hitbox_style.outline");
     private final BooleanSetting syncWithTheme = new BooleanSetting(this, "modules.settings.sync_with_theme").enable();
     private final ColorSetting color = new ColorSetting(this, "color", () -> this.syncWithTheme.isEnabled()).color(Colors.getAccentColor());
     private final BooleanSetting inHand = new BooleanSetting(this, "modules.settings.prediction.hand").enable();
     private final BooleanSetting walls = new BooleanSetting(this, "modules.settings.prediction.walls").enable();
     private final BooleanSetting hud = new BooleanSetting(this, "modules.settings.prediction.hud");
+    private Entity lookedAtEntity;
 
     private final EventListener<HudRenderEvent> onRender2D = event -> {
         CustomDrawContext context = event.getContext();
@@ -206,15 +221,25 @@ public class Prediction extends BaseModule {
             }
 
             if (this.defaultMode.isSelected()) {
-                GlProgram.usePositionColor();
-                BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
-                for (Predicted pred : renderablePredictions) {
-                    this.drawPredictionPath(ms, builder, pred, camera.position(), event.getGameTimeDeltaPartialTick());
+                GlProgram.clearActive();
+                GL11.glLineWidth(1.5f);
+                if (!renderablePredictions.isEmpty()) {
+                    BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
+                    for (Predicted pred : renderablePredictions) {
+                        this.drawPredictionPath(ms, builder, pred, camera.position(), event.getGameTimeDeltaPartialTick());
+                    }
+                    MeshData mesh = builder.build();
+                    if (mesh != null) {
+                        com.mojang.blaze3d.pipeline.RenderPipeline pipeline = this.walls.isEnabled() ? PREDICTION_LINES_THROUGH : PREDICTION_LINES;
+                        try {
+                            moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = this.walls.isEnabled();
+                            MeshDrawHelper.draw(mesh, pipeline);
+                        } finally {
+                            moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = false;
+                        }
+                    }
                 }
-                MeshData mesh = builder.build();
-                if (mesh != null) {
-                    MeshDrawHelper.drawBuilt(mesh);
-                }
+                GL11.glLineWidth(1.0f);
             } else {
                 Identifier id = Rockstar.id("textures/bloom.png");
                 TextureBinder.bind(id);
@@ -264,25 +289,46 @@ public class Prediction extends BaseModule {
             GL11.glDisable(GL11.GL_CULL_FACE);
             GL11.glDisable(GL11.GL_DEPTH_TEST);
 
-            GlProgram.usePositionColor();
-            BufferBuilder quadsBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-            for (Landed land : this.landed) {
-                if (land.collidedEntity == null) continue;
-                Draw3DUtility.renderFilledBox(ms, quadsBuffer, land.collidedEntity.getBoundingBox(), this.getRenderColor().mulAlpha(0.5f));
-            }
-            MeshData quadsMesh = quadsBuffer.build();
-            if (quadsMesh != null) {
-                MeshDrawHelper.drawBuilt(quadsMesh);
-            }
+            List<Entity> hitboxTargets = this.collectHitboxTargets();
 
-            BufferBuilder linesBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
-            for (Landed land : this.landed) {
-                if (land.collidedEntity == null) continue;
-                this.drawBoxLines(ms, linesBuffer, land.collidedEntity.getBoundingBox(), this.getRenderColor());
-            }
-            MeshData linesMesh = linesBuffer.build();
-            if (linesMesh != null) {
-                MeshDrawHelper.drawBuilt(linesMesh);
+            if (this.gradientHitbox.isSelected()) {
+                GlProgram.usePositionColor();
+                BufferBuilder quadsBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+                boolean charged = this.isProjectileReady();
+                ColorRGBA baseColor = this.getRenderColor();
+                ColorRGBA brightColor = ColorRGBA.WHITE.mix(baseColor, 0.45f)
+                    .withAlpha(Mth.clamp(baseColor.getAlpha() * 2.4f, 0.0f, 255.0f));
+                for (Entity target : hitboxTargets) {
+                    boolean boost = charged && target == this.lookedAtEntity;
+                    this.drawGradientBox(ms, quadsBuffer, target.getBoundingBox(), boost ? brightColor : baseColor);
+                }
+                MeshData quadsMesh = quadsBuffer.build();
+                if (quadsMesh != null) {
+                    MeshDrawHelper.drawBuilt(quadsMesh);
+                }
+            } else {
+                GlProgram.clearActive();
+                GL11.glLineWidth(2.0f);
+                if (!hitboxTargets.isEmpty()) {
+                    BufferBuilder linesBuffer = Tesselator.getInstance().begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
+                    boolean charged = this.isProjectileReady();
+                    ColorRGBA outlineBase = this.getRenderColor().withAlpha(255.0f);
+                    ColorRGBA outlineBright = ColorRGBA.WHITE.mix(outlineBase, 0.4f).withAlpha(255.0f);
+                    for (Entity target : hitboxTargets) {
+                        boolean boost = charged && target == this.lookedAtEntity;
+                        this.drawBoxLines(ms, linesBuffer, target.getBoundingBox(), boost ? outlineBright : outlineBase);
+                    }
+                    MeshData linesMesh = linesBuffer.build();
+                    if (linesMesh != null) {
+                        try {
+                            moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = true;
+                            MeshDrawHelper.draw(linesMesh, PREDICTION_LINES_THROUGH);
+                        } finally {
+                            moscow.rockstar.utility.render.MeshDrawHelper.disableDepthOverride = false;
+                        }
+                    }
+                }
+                GL11.glLineWidth(1.0f);
             }
         } finally {
             TextureBinder.unbind();
@@ -310,6 +356,7 @@ public class Prediction extends BaseModule {
     public void tick() {
         this.predicted.clear();
         this.landed.clear();
+        this.lookedAtEntity = this.findLookedAtEntity();
         ArrayList<Arrow> projectiles = new ArrayList<>();
         if (this.inHand.isEnabled()) {
             ItemStack handStack = Prediction.mc.player.getMainHandItem();
@@ -431,6 +478,54 @@ public class Prediction extends BaseModule {
             return false;
         }
         return Math.abs(entity.getDeltaMovement().x + entity.getDeltaMovement().z) > 0.01f || Math.abs(entity.getDeltaMovement().y) > 0.2f;
+    }
+
+    private boolean isProjectileReady() {
+        if (Prediction.mc.player == null) {
+            return false;
+        }
+        ItemStack stack = Prediction.mc.player.getMainHandItem();
+        if (stack.isEmpty()) {
+            return false;
+        }
+        if (stack.getItem() instanceof EnderpearlItem) {
+            return true;
+        }
+        if (stack.getItem() instanceof CrossbowItem && CrossbowItem.isCharged(stack)) {
+            return true;
+        }
+        if ((stack.getItem() instanceof BowItem || stack.getItem() instanceof TridentItem) && Prediction.mc.player.isUsingItem()) {
+            return true;
+        }
+        return false;
+    }
+
+    private Entity findLookedAtEntity() {
+        if (Prediction.mc.player == null || Prediction.mc.level == null) {
+            return null;
+        }
+        Vec3 eyes = Prediction.mc.player.getEyePosition(1.0f);
+        Vec3 look = Prediction.mc.player.getViewVector(1.0f);
+        Vec3 end = eyes.add(look.scale(LOOK_REACH));
+        AABB searchBox = Prediction.mc.player.getBoundingBox().expandTowards(look.scale(LOOK_REACH)).inflate(1.0);
+        EntityHitResult hit = ProjectileUtil.getEntityHitResult(
+            Prediction.mc.player,
+            eyes,
+            end,
+            searchBox,
+            entity -> entity != Prediction.mc.player && entity.isAlive() && entity.isPickable()
+                && !(entity instanceof ExperienceOrb) && !(entity instanceof ItemEntity),
+            LOOK_REACH * LOOK_REACH
+        );
+        if (hit == null) {
+            return null;
+        }
+        Vec3 hitPos = hit.getLocation();
+        BlockHitResult blockHit = Prediction.mc.level.clip(new ClipContext(eyes, hitPos, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, Prediction.mc.player));
+        if (blockHit.getType() != HitResult.Type.MISS && blockHit.getLocation().distanceToSqr(eyes) < hitPos.distanceToSqr(eyes)) {
+            return null;
+        }
+        return hit.getEntity();
     }
 
     private Entity checkEntityCollision(Entity movingEntity, Vec3 predictedPos) {
@@ -565,7 +660,7 @@ public class Prediction extends BaseModule {
                 continue;
             }
             Vec3 smoothPos = this.getSmoothedLandedPosition(orbCount, targetPos);
-            this.drawImpactOrbCrystal(ms, crystalBuffer, smoothPos, tickDelta, orbCount);
+            this.drawImpactOrbSphere(ms, crystalBuffer, smoothPos, tickDelta, orbCount);
             ++orbCount;
         }
         this.trimSmoothedLandings(orbCount);
@@ -593,23 +688,69 @@ public class Prediction extends BaseModule {
         }
     }
 
-    private void drawImpactOrbCrystal(PoseStack ms, BufferBuilder buffer, Vec3 pos, float tickDelta, int index) {
-        float time = (mc.level != null ? mc.level.getGameTime() : 0) + tickDelta + index * 17.0f;
-        float spin = time * 2.3f;
-        float tilt = 8.0f + 2.0f * Mth.sin(time * 0.05f);
-        float size = 0.043f + 0.0025f * Mth.sin(time * 0.09f);
-        ColorRGBA color = this.getRenderColor();
+    private void drawImpactOrbSphere(PoseStack ms, BufferBuilder buffer, Vec3 pos, float tickDelta, int index) {
+        float radius = 0.22f;
+        ColorRGBA base = this.getRenderColor();
         ms.pushPose();
         ms.translate(pos.x, pos.y, pos.z);
-        for (int i = 0; i < 3; ++i) {
-            ms.pushPose();
-            ms.mulPose(Axis.YP.rotationDegrees(spin + i * 57.0f));
-            ms.mulPose(Axis.XP.rotationDegrees(tilt + i * 21.0f));
-            ms.mulPose(Axis.ZP.rotationDegrees(i == 0 ? 0.0f : (i == 1 ? 90.0f : 45.0f)));
-            moscow.rockstar.utility.render.CrystalRenderer.render(ms, buffer, 0.0f, 0.0f, 0.0f, size, color.withAlpha(i == 0 ? color.getAlpha() : color.getAlpha() * (170.0f / 255.0f)));
-            ms.popPose();
-        }
+        Matrix4f matrix = ms.last().pose();
+        emitSphere(buffer, matrix, radius, base, 1.0f);
+        emitSphere(buffer, matrix, radius * 1.35f, base, 0.28f);
         ms.popPose();
+    }
+
+    private static final int SPHERE_RINGS = 10;
+    private static final int SPHERE_SECTORS = 16;
+
+    private static void emitSphere(BufferBuilder buffer, Matrix4f matrix, float radius, ColorRGBA color, float alphaMul) {
+        float baseAlpha = color.getAlpha() * alphaMul;
+        int rings = SPHERE_RINGS;
+        int sectors = SPHERE_SECTORS;
+        float[][][] cache = new float[rings + 1][sectors + 1][3];
+        for (int r = 0; r <= rings; ++r) {
+            float v = (float) r / (float) rings;
+            float phi = (float) Math.PI * v;
+            float sinPhi = Mth.sin(phi);
+            float cosPhi = Mth.cos(phi);
+            for (int s = 0; s <= sectors; ++s) {
+                float u = (float) s / (float) sectors;
+                float theta = (float) (Math.PI * 2.0) * u;
+                float sinTheta = Mth.sin(theta);
+                float cosTheta = Mth.cos(theta);
+                cache[r][s][0] = radius * sinPhi * cosTheta;
+                cache[r][s][1] = radius * cosPhi;
+                cache[r][s][2] = radius * sinPhi * sinTheta;
+            }
+        }
+        for (int r = 0; r < rings; ++r) {
+            for (int s = 0; s < sectors; ++s) {
+                float[] v00 = cache[r][s];
+                float[] v01 = cache[r][s + 1];
+                float[] v10 = cache[r + 1][s];
+                float[] v11 = cache[r + 1][s + 1];
+                int c00 = shadeSphereVertex(color, baseAlpha, v00[1], radius);
+                int c01 = shadeSphereVertex(color, baseAlpha, v01[1], radius);
+                int c10 = shadeSphereVertex(color, baseAlpha, v10[1], radius);
+                int c11 = shadeSphereVertex(color, baseAlpha, v11[1], radius);
+                buffer.addVertex(matrix, v00[0], v00[1], v00[2]).setColor(c00);
+                buffer.addVertex(matrix, v10[0], v10[1], v10[2]).setColor(c10);
+                buffer.addVertex(matrix, v11[0], v11[1], v11[2]).setColor(c11);
+                buffer.addVertex(matrix, v00[0], v00[1], v00[2]).setColor(c00);
+                buffer.addVertex(matrix, v11[0], v11[1], v11[2]).setColor(c11);
+                buffer.addVertex(matrix, v01[0], v01[1], v01[2]).setColor(c01);
+            }
+        }
+    }
+
+    private static int shadeSphereVertex(ColorRGBA color, float baseAlpha, float y, float radius) {
+        float n = radius <= 1.0E-4f ? 0.0f : Mth.clamp(y / radius, -1.0f, 1.0f);
+        // Soft top-down shading: brightest at top, fades toward bottom. Keeps the theme hue.
+        float brightness = 0.55f + 0.45f * (n * 0.5f + 0.5f);
+        int a = (int) Mth.clamp(baseAlpha, 0.0f, 255.0f);
+        int r = (int) Mth.clamp(color.getRed() * brightness, 0.0f, 255.0f);
+        int g = (int) Mth.clamp(color.getGreen() * brightness, 0.0f, 255.0f);
+        int b = (int) Mth.clamp(color.getBlue() * brightness, 0.0f, 255.0f);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     private boolean isDuplicateLandedTarget(Vec3 targetPos, int activeCount) {
@@ -652,36 +793,126 @@ public class Prediction extends BaseModule {
 
     private void drawPredictionPath(PoseStack matrices, BufferBuilder builder, Predicted pred, Vec3 cameraPos, float tickDelta) {
         Vec3 startPos = Utils.getInterpolatedPos(pred.entity, tickDelta);
-        Vec3 firstPos = pred.vectors.getFirst();
-        if (this.shouldDrawSegment(startPos, firstPos, cameraPos)) {
-            this.drawPredictionLine(matrices, builder, startPos, firstPos, this.getRenderColor());
+        ArrayList<Vec3> path = new ArrayList<>();
+        path.add(startPos);
+        for (Vec3 v : pred.vectors) {
+            path.add(v);
         }
-        Vec3 prevPos = firstPos;
-        for (int i = 1; i < pred.vectors.size(); ++i) {
-            Vec3 pos = pred.vectors.get(i);
-            if (this.shouldDrawSegment(prevPos, pos, cameraPos)) {
-                this.drawPredictionLine(matrices, builder, prevPos, pos, this.getRenderColor());
+        ColorRGBA color = this.getRenderColor();
+        PoseStack.Pose matrixEntry = matrices.last();
+        Matrix4f matrix = matrixEntry.pose();
+        int rgb = color.getRGB();
+        float lineWidth = 1.25f;
+        Vec3 prevEmitted = null;
+        for (int i = 0; i < path.size(); ++i) {
+            Vec3 pos = path.get(i);
+            if (pos.distanceToSqr(cameraPos) < MIN_CAMERA_DISTANCE_SQR) {
+                prevEmitted = null;
+                continue;
             }
-            prevPos = pos;
+            if (prevEmitted == null) {
+                prevEmitted = pos;
+                continue;
+            }
+            if (pos.distanceToSqr(prevEmitted) < MIN_SEGMENT_DISTANCE_SQR) {
+                continue;
+            }
+            float dx = (float)(pos.x - prevEmitted.x);
+            float dy = (float)(pos.y - prevEmitted.y);
+            float dz = (float)(pos.z - prevEmitted.z);
+            float len = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < 1.0E-6f) {
+                dx = 0.0f;
+                dy = 1.0f;
+                dz = 0.0f;
+            } else {
+                dx /= len;
+                dy /= len;
+                dz /= len;
+            }
+            builder.addVertex(matrix, (float)prevEmitted.x, (float)prevEmitted.y, (float)prevEmitted.z)
+                   .setColor(rgb)
+                   .setNormal(matrixEntry, dx, dy, dz)
+                   .setLineWidth(lineWidth);
+            builder.addVertex(matrix, (float)pos.x, (float)pos.y, (float)pos.z)
+                   .setColor(rgb)
+                   .setNormal(matrixEntry, dx, dy, dz)
+                   .setLineWidth(lineWidth);
+            prevEmitted = pos;
         }
     }
 
-    private boolean shouldDrawSegment(Vec3 startPos, Vec3 endPos, Vec3 cameraPos) {
-        if (startPos.distanceToSqr(endPos) < MIN_SEGMENT_DISTANCE_SQR) {
+    private List<Entity> collectHitboxTargets() {
+        ArrayList<Entity> targets = new ArrayList<>();
+        if (this.lookedAtEntity != null && this.lookedAtEntity.isAlive() && this.isHoldingRangedWeapon()) {
+            targets.add(this.lookedAtEntity);
+        }
+        for (Landed land : this.landed) {
+            if (land.collidedEntity == null || !land.collidedEntity.isAlive()) continue;
+            if (targets.contains(land.collidedEntity)) continue;
+            targets.add(land.collidedEntity);
+        }
+        return targets;
+    }
+
+    private boolean isHoldingRangedWeapon() {
+        if (Prediction.mc.player == null) {
             return false;
         }
-        return !(startPos.distanceToSqr(cameraPos) < MIN_CAMERA_DISTANCE_SQR || endPos.distanceToSqr(cameraPos) < MIN_CAMERA_DISTANCE_SQR);
+        ItemStack stack = Prediction.mc.player.getMainHandItem();
+        if (stack.isEmpty()) {
+            return false;
+        }
+        return stack.getItem() instanceof BowItem
+            || stack.getItem() instanceof CrossbowItem
+            || stack.getItem() instanceof TridentItem;
     }
 
-    private void drawPredictionLine(PoseStack matrices, BufferBuilder builder, Vec3 startPos, Vec3 endPos, ColorRGBA color) {
-        PoseStack.Pose matrixEntry = matrices.last();
-        Matrix4f matrix4f = matrixEntry.pose();
-        Vec3 normalized = endPos.subtract(startPos).normalize();
-        if (normalized.lengthSqr() < 1.0E-6f) {
-            normalized = new Vec3(0, 1, 0);
-        }
-        builder.addVertex(matrix4f, (float)startPos.x, (float)startPos.y, (float)startPos.z).setColor(color.getRGB()).setNormal(matrixEntry, (float)normalized.x, (float)normalized.y, (float)normalized.z).setLineWidth(1.25f);
-        builder.addVertex(matrix4f, (float)endPos.x, (float)endPos.y, (float)endPos.z).setColor(color.getRGB()).setNormal(matrixEntry, (float)normalized.x, (float)normalized.y, (float)normalized.z).setLineWidth(1.25f);
+    private void drawGradientBox(PoseStack ms, BufferBuilder buffer, AABB box, ColorRGBA color) {
+        float minX = (float)box.minX;
+        float minY = (float)box.minY;
+        float minZ = (float)box.minZ;
+        float maxX = (float)box.maxX;
+        float maxY = (float)box.maxY;
+        float maxZ = (float)box.maxZ;
+
+        float r = color.getRed() / 255.0f;
+        float g = color.getGreen() / 255.0f;
+        float b = color.getBlue() / 255.0f;
+        float aBottom = Mth.clamp(color.getAlpha() / 255.0f * 1.2f, 0.0f, 1.0f);
+        float aTop = 0.0f;
+
+        Matrix4f matrix = ms.last().pose();
+
+        // North face (z=minZ)
+        buffer.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, maxY, minZ).setColor(r, g, b, aTop);
+        buffer.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, aTop);
+
+        // South face (z=maxZ)
+        buffer.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, aTop);
+        buffer.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, aTop);
+
+        // West face (x=minX)
+        buffer.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, aTop);
+        buffer.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, aTop);
+
+        // East face (x=maxX)
+        buffer.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, aTop);
+        buffer.addVertex(matrix, maxX, maxY, minZ).setColor(r, g, b, aTop);
+
+        // Bottom face (y=minY) — solid bottom for flame base
+        buffer.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, aBottom);
+        buffer.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, aBottom);
     }
 
     private void drawBoxLines(PoseStack ms, BufferBuilder buffer, AABB box, ColorRGBA color) {
@@ -691,46 +922,54 @@ public class Prediction extends BaseModule {
         float maxX = (float)box.maxX;
         float maxY = (float)box.maxY;
         float maxZ = (float)box.maxZ;
-        
-        Vec3[] vertices = {
-            new Vec3(minX, minY, minZ), new Vec3(maxX, minY, minZ),
-            new Vec3(maxX, minY, minZ), new Vec3(maxX, minY, maxZ),
-            new Vec3(maxX, minY, maxZ), new Vec3(minX, minY, maxZ),
-            new Vec3(minX, minY, maxZ), new Vec3(minX, minY, minZ),
-            
-            new Vec3(minX, maxY, minZ), new Vec3(maxX, maxY, minZ),
-            new Vec3(maxX, maxY, minZ), new Vec3(maxX, maxY, maxZ),
-            new Vec3(maxX, maxY, maxZ), new Vec3(minX, maxY, maxZ),
-            new Vec3(minX, maxY, maxZ), new Vec3(minX, maxY, minZ),
-            
-            new Vec3(minX, minY, minZ), new Vec3(minX, maxY, minZ),
-            new Vec3(maxX, minY, minZ), new Vec3(maxX, maxY, minZ),
-            new Vec3(maxX, minY, maxZ), new Vec3(maxX, maxY, maxZ),
-            new Vec3(minX, minY, maxZ), new Vec3(minX, maxY, maxZ)
-        };
-        
+
         PoseStack.Pose entry = ms.last();
         Matrix4f matrix = entry.pose();
         int rgb = color.getRGB();
-        
-        for (int i = 0; i < vertices.length; i += 2) {
-            Vec3 start = vertices[i];
-            Vec3 end = vertices[i + 1];
-            Vec3 normalized = end.subtract(start).normalize();
-            if (normalized.lengthSqr() < 1.0E-6f) {
-                normalized = new Vec3(0, 1, 0);
-            }
-            
-            buffer.addVertex(matrix, (float)start.x, (float)start.y, (float)start.z)
-                  .setColor(rgb)
-                  .setNormal(entry, (float)normalized.x, (float)normalized.y, (float)normalized.z)
-                  .setLineWidth(1.0f);
-                  
-            buffer.addVertex(matrix, (float)end.x, (float)end.y, (float)end.z)
-                  .setColor(rgb)
-                  .setNormal(entry, (float)normalized.x, (float)normalized.y, (float)normalized.z)
-                  .setLineWidth(1.0f);
+        float lineWidth = 2.0f;
+
+        // Bottom face (4 edges)
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, minY, minZ, maxX, minY, minZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, minY, minZ, maxX, minY, maxZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, minY, maxZ, minX, minY, maxZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, minY, maxZ, minX, minY, minZ);
+
+        // Top face (4 edges)
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, maxY, minZ, maxX, maxY, minZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, maxY, minZ, maxX, maxY, maxZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, maxY, maxZ, minX, maxY, maxZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, maxY, maxZ, minX, maxY, minZ);
+
+        // Vertical edges (4 edges)
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, minY, minZ, minX, maxY, minZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, minY, minZ, maxX, maxY, minZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, maxX, minY, maxZ, maxX, maxY, maxZ);
+        this.addLine(buffer, entry, matrix, rgb, lineWidth, minX, minY, maxZ, minX, maxY, maxZ);
+    }
+
+    private void addLine(BufferBuilder buffer, PoseStack.Pose entry, Matrix4f matrix, int rgb, float lineWidth,
+                         float x0, float y0, float z0, float x1, float y1, float z1) {
+        float nx = x1 - x0;
+        float ny = y1 - y0;
+        float nz = z1 - z0;
+        float len = (float)Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1.0E-6f) {
+            nx = 0.0f;
+            ny = 1.0f;
+            nz = 0.0f;
+        } else {
+            nx /= len;
+            ny /= len;
+            nz /= len;
         }
+        buffer.addVertex(matrix, x0, y0, z0)
+              .setColor(rgb)
+              .setNormal(entry, nx, ny, nz)
+              .setLineWidth(lineWidth);
+        buffer.addVertex(matrix, x1, y1, z1)
+              .setColor(rgb)
+              .setNormal(entry, nx, ny, nz)
+              .setLineWidth(lineWidth);
     }
 
     public List<Predicted> getPredicted() {

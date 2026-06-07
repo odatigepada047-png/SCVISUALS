@@ -154,6 +154,18 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
         return pitch;
     }
 
+    @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V", at = @At("HEAD"), argsOnly = true)
+    private SubmitNodeCollector wrapCollector(SubmitNodeCollector original, S state) {
+        Entity entity = ((EntityRenderStateAddition) state).rockstar$getEntity();
+        if (entity instanceof Player player) {
+            FriendMarkers markers = rockstar$getFriendMarkers();
+            if (markers != null && markers.isChamsMode() && Rockstar.getInstance().getFriendManager().isFriend(player.getName().getString())) {
+                return new moscow.rockstar.utility.render.FriendChamsCollector(original);
+            }
+        }
+        return original;
+    }
+
     @WrapOperation(method={"submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"}, at={@At(value="INVOKE", target="Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V")}, require=1)
     private void changeModelColor(
         SubmitNodeCollector collector,
@@ -248,6 +260,37 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
             color = targetESP.getColor().withAlpha(127.0f).getRGB();
             light = 0xF000F0;
         }
+        moscow.rockstar.systems.modules.modules.visuals.FriendMarkers friendMarkers = rockstar$getFriendMarkers();
+        if (friendMarkers != null && entity instanceof Player && Rockstar.getInstance().getFriendManager().isFriend(entity.getName().getString())) {
+            if (friendMarkers.isChamsMode()) {
+                RenderType newRenderType = renderType;
+                try {
+                    moscow.rockstar.mixin.accessors.RenderTypeAccessor typeAcc = (moscow.rockstar.mixin.accessors.RenderTypeAccessor) renderType;
+                    net.minecraft.client.renderer.rendertype.RenderSetup setup = typeAcc.getState();
+                    java.util.Map<String, ?> textures = ((moscow.rockstar.mixin.accessors.RenderSetupAccessor) (Object) setup).getTextures();
+                    if (textures != null && !textures.isEmpty()) {
+                        Object binding = textures.values().iterator().next();
+                        if (binding != null) {
+                            java.lang.reflect.Method locationMethod = binding.getClass().getMethod("location");
+                            Identifier textureId = (Identifier) locationMethod.invoke(binding);
+                            if (textureId != null) {
+                                newRenderType = moscow.rockstar.systems.modules.modules.visuals.TargetESP.getChamsRenderType(textureId);
+                            }
+                        }
+                    }
+                } catch (Throwable t) {
+                    newRenderType = moscow.rockstar.systems.modules.modules.visuals.TargetESP.getChamsRenderType(Rockstar.id("textures/white.png"));
+                }
+                renderType = newRenderType;
+                color = friendMarkers.getColor().withAlpha(127.0f).getRGB();
+                light = 0xF000F0;
+            } else if (friendMarkers.isArmorMode()) {
+                if (instance != this.model) {
+                    color = moscow.rockstar.utility.colors.Colors.getAccentColor().getRGB();
+                    light = 0xF000F0;
+                }
+            }
+        }
         original.call(new Object[]{collector, instance, state, matrixStack, renderType, light, overlay, color, sprite, p9, crumbling});
     }
     @ModifyVariable(method = "getRenderType", at = @At("HEAD"), ordinal = 2, argsOnly = true)
@@ -274,6 +317,11 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
         if (entity instanceof LivingEntity) {
             moscow.rockstar.systems.modules.modules.visuals.TargetESP targetESP = rockstar$getTargetESP();
             if (targetESP != null && targetESP.isEnabled() && targetESP.isChamsMode() && targetESP.getPrevTarget() != null && targetESP.getPrevTarget().getId() == entity.getId()) {
+                Identifier texture = getTextureLocation(state);
+                return moscow.rockstar.systems.modules.modules.visuals.TargetESP.getChamsRenderType(texture);
+            }
+            FriendMarkers friendMarkers = rockstar$getFriendMarkers();
+            if (friendMarkers != null && friendMarkers.isChamsMode() && entity instanceof Player && Rockstar.getInstance().getFriendManager().isFriend(entity.getName().getString())) {
                 Identifier texture = getTextureLocation(state);
                 return moscow.rockstar.systems.modules.modules.visuals.TargetESP.getChamsRenderType(texture);
             }

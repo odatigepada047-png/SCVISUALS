@@ -13,6 +13,7 @@ package moscow.rockstar.utility.sounds;
 import dev.redstones.mediaplayerinfo.IMediaSession;
 import dev.redstones.mediaplayerinfo.MediaPlayerInfo;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +39,10 @@ implements IMinecraft {
     private static final RandomSource RANDOM = RandomSource.create();
     private String lyrics = "";
     private String lastTrack = "";
+    private volatile List<TimedLyric> syncedLyrics = Collections.emptyList();
+    private int debugTickCount = 0;
+    private int debugLastSize = -1;
+    private String debugLastImpl = "";
 
     public MusicTracker() {
         this.thread = new Thread(() -> {
@@ -69,20 +74,77 @@ implements IMinecraft {
             // Проверяем OS перед вызовом нативного метода (хотя библиотека это делает внутри)
             if (!System.getProperty("os.name").toLowerCase().contains("win")) return;
 
+            String implName = MediaPlayerInfo.INSTANCE.getClass().getName();
+            if (!implName.equals(this.debugLastImpl)) {
+                System.out.println("[MusicTracker] using impl: " + implName);
+                this.debugLastImpl = implName;
+            }
             List<IMediaSession> sessions = MediaPlayerInfo.INSTANCE.getMediaSessions();
+            int size = sessions == null ? -1 : sessions.size();
+            if (size != this.debugLastSize) {
+                System.out.println("[MusicTracker] getMediaSessions() -> size=" + size);
+                if (sessions != null) {
+                    for (int i = 0; i < sessions.size(); ++i) {
+                        IMediaSession s = sessions.get(i);
+                        if (s == null) { System.out.println("  [" + i + "] null"); continue; }
+                        String owner = "?";
+                        try { owner = s.getOwner(); } catch (Throwable ignored) {}
+                        String t = "?", a = "?";
+                        try {
+                            if (s.getMedia() != null) {
+                                t = s.getMedia().getTitle();
+                                a = s.getMedia().getArtist();
+                            }
+                        } catch (Throwable ignored) {}
+                        System.out.println("  [" + i + "] owner=" + owner + " title='" + t + "' artist='" + a + "'");
+                    }
+                }
+                this.debugLastSize = size;
+            }
+            ++this.debugTickCount;
+            if (this.debugTickCount % 20 == 0) {
+                System.out.println("[MusicTracker] heartbeat tick=" + this.debugTickCount + " size=" + size + " session=" + (this.session == null ? "null" : "active"));
+            }
             if (sessions == null || sessions.isEmpty()) return;
 
-            this.session = sessions.stream()
-                .filter(session1 -> session1 != null && session1.getMedia() != null 
-                    && !session1.getMedia().getArtist().isEmpty() 
-                    && !session1.getMedia().getTitle().isEmpty())
-                .findFirst()
-                .orElse(null);
+            IMediaSession full = null;
+            IMediaSession titleOnly = null;
+            for (IMediaSession s : sessions) {
+                if (s == null || s.getMedia() == null) continue;
+                String t = s.getMedia().getTitle();
+                String a = s.getMedia().getArtist();
+                if (t == null || t.isEmpty()) continue;
+                if (a != null && !a.isEmpty()) {
+                    if (full == null) full = s;
+                } else if (titleOnly == null) {
+                    titleOnly = s;
+                }
+            }
+            this.session = full != null ? full : titleOnly;
 
-            if (this.session != null && !(trackId = this.session.getMedia().getArtist() + " - " + this.session.getMedia().getTitle()).equals(this.lastTrack)) {
+            if (this.session != null) {
+                String a = this.session.getMedia().getArtist();
+                String t = this.session.getMedia().getTitle();
+                trackId = (a == null || a.isEmpty()) ? t : (a + " - " + t);
+            } else {
+                trackId = null;
+            }
+
+            if (this.session != null && !trackId.equals(this.lastTrack)) {
                 this.lastTrack = trackId;
                 this.lyrics = "";
-
+                this.syncedLyrics = Collections.emptyList();
+                String artist = this.session.getMedia().getArtist();
+                String title = this.session.getMedia().getTitle();
+                String fetchingFor = trackId;
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    try {
+                        List<TimedLyric> result = LyricsFetcher.fetchSyncedLyrics(artist, title);
+                        if (fetchingFor.equals(this.lastTrack)) {
+                            this.syncedLyrics = result;
+                        }
+                    } catch (Throwable ignored) {}
+                });
             }
         }
         catch (Throwable throwable) {
@@ -227,5 +289,25 @@ implements IMinecraft {
     @Generated
     public String getLastTrack() {
         return this.lastTrack;
+    }
+
+    public List<TimedLyric> getSyncedLyrics() {
+        return this.syncedLyrics;
+    }
+
+    public int getCurrentSyncedIndex(long positionMs) {
+        List<TimedLyric> list = this.syncedLyrics;
+        if (list.isEmpty()) return -1;
+        int lo = 0, hi = list.size() - 1, result = -1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            if (list.get(mid).getTimeMs() <= positionMs) {
+                result = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return result;
     }
 }

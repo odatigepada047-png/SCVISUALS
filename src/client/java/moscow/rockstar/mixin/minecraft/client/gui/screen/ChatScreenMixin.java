@@ -39,7 +39,8 @@ public class ChatScreenMixin implements IMinecraft {
 
     @Inject(method={"mouseClicked"}, at={@At(value="HEAD")})
     private void onMouseClick(MouseButtonEvent event, boolean doubled, CallbackInfoReturnable<Boolean> cir) {
-        Rockstar.getInstance().getEventManager().triggerEvent(new ChatClickEvent((float)event.x(), (float)event.y(), event.button()));
+        Rockstar.getInstance().getEventManager().triggerEvent(new ChatClickEvent((float)event.x(), (float)event.y(), event.button(), doubled));
     }
+
 
 }

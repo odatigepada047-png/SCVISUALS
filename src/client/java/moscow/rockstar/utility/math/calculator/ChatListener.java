@@ -17,7 +17,12 @@ import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 
 public class ChatListener
 implements IMinecraft {
+    private boolean calculating = false;
+
     private final EventListener<SendPacketEvent> onSendPacket = event -> {
+        if (this.calculating) {
+            return;
+        }
         Packet<?> patt0$temp = event.getPacket();
         if (patt0$temp instanceof ServerboundChatCommandPacket) {
             ServerboundChatCommandPacket packet = (ServerboundChatCommandPacket)patt0$temp;
@@ -26,14 +31,33 @@ implements IMinecraft {
             }
             String message = packet.command();
             if (message.startsWith("ah me")) {
-                ChatListener.mc.player.connection.sendChat("/ah " + ChatListener.mc.player.getName().getString());
+                this.calculating = true;
+                try {
+                    ChatListener.mc.player.connection.sendCommand("ah " + ChatListener.mc.player.getName().getString());
+                } finally {
+                    this.calculating = false;
+                }
                 event.cancel();
             }
             if (message.startsWith("ah sell ")) {
                 String expression = message.replaceFirst("ah sell ", "");
-                String result = MathUtility.calculate(expression);
-                ChatListener.mc.player.connection.sendChat("/ah sell " + Math.round(Float.parseFloat(result)));
-                event.cancel();
+                boolean success = false;
+                String resultCommand = null;
+                try {
+                    String result = MathUtility.calculate(expression);
+                    resultCommand = "ah sell " + Math.round(Float.parseFloat(result));
+                    success = true;
+                } catch (Exception ignored) {
+                }
+                if (success && resultCommand != null) {
+                    this.calculating = true;
+                    try {
+                        ChatListener.mc.player.connection.sendCommand(resultCommand);
+                    } finally {
+                        this.calculating = false;
+                    }
+                    event.cancel();
+                }
             }
         }
     };

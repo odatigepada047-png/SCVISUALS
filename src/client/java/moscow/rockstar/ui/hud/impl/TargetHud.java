@@ -77,13 +77,7 @@ public class TargetHud extends HudElement {
         if (this.visible.getValue() == 0.0f) {
             this.target = null;
         }
-        float currentAbsWidth = 0.0f;
-        if (this.target != null) {
-            String absText = " + " + TextUtility.formatNumber(this.absNumberAnim.getRGB()).replace(",", ".");
-            float absWidth = Fonts.SEMIBOLD.getFont(6.0f).width(absText);
-            currentAbsWidth = absWidth * this.goldenTextAnim.getRGB();
-        }
-        this.width = 103.0f + currentAbsWidth;
+        this.width = 103.0f;
         this.height = 31.0f;
         super.update(context);
     }
@@ -113,9 +107,11 @@ public class TargetHud extends HudElement {
         ColorRGBA bgColor = Colors.getBackgroundColor().withAlpha(255.0f * (dark ? 0.8f - 0.6f * Interface.glass() : 0.7f));
 
         float contentYAnim = 6.0f * this.content.getRGB();
+        float g = this.goldenTextAnim.getRGB();
+        float textY = this.y + 3.0f + contentYAnim - 2.0f * g;
 
         // Логика наведения для копирования
-        boolean hover = GuiUtility.isHovered(this.x + 30.0f, this.y + 3.0f + contentYAnim, 60.0, 6.0, context);
+        boolean hover = GuiUtility.isHovered(this.x + 30.0f, textY, 60.0, 6.0, context);
         if (!hover || this.copyTimer.finished(1000L)) {
             this.copied = false;
         }
@@ -140,7 +136,7 @@ public class TargetHud extends HudElement {
         float abs = this.target.getAbsorptionAmount();
         float baseHp = Math.max(0.0f, rawHp - abs);
 
-        this.health.update(rawHp / this.target.getMaxHealth());
+        this.health.update(baseHp / this.target.getMaxHealth());
         this.golden.update(abs / 20.0f);
         this.number.update(baseHp);
         this.absNumberAnim.update(abs);
@@ -181,8 +177,8 @@ public class TargetHud extends HudElement {
         String name = this.target.getName().getString();
         String hpText = rawHp == 1000.0f ? "?" : TextUtility.formatNumber(this.number.getRGB()).replace(",", ".");
         String absText = " + " + TextUtility.formatNumber(this.absNumberAnim.getRGB()).replace(",", ".");
-        float textY = this.y + 3.0f + contentYAnim;
-        float absWidth = semibold6.width(absText);
+        float hpY = this.y + 3.5f + contentYAnim - 2.0f * g;
+        float goldenHpY = hpY + 7.0f * g;
 
         // Рендер иконки еды (когда используется)
         if (this.eatingPulse.getRGB() > 0.001f) {
@@ -203,7 +199,7 @@ public class TargetHud extends HudElement {
                 this.x + 30.0f + eatOffset + copyOffset,
                 textY,
                 Colors.getTextColor().withAlpha(alpha), 0.7f, 1.0f,
-                this.width - 40.0f - (eatOffset + copyOffset) - semibold6.width(hpText) - absWidth * this.goldenTextAnim.getRGB());
+                this.width - 40.0f - (eatOffset + copyOffset) - semibold6.width(hpText));
 
         // Рендер иконки копирования
         if (this.copy.getRGB() > 0.001f) {
@@ -220,25 +216,26 @@ public class TargetHud extends HudElement {
 
         // ХП текст справа
         float rightX = this.x + this.width - 7.0f;
-        float hpY = this.y + 3.5f + contentYAnim;
-        float currentAbsWidth = absWidth * this.goldenTextAnim.getRGB();
-        float baseHpX = rightX - currentAbsWidth;
+        context.drawRightText(semibold6, hpText, rightX, hpY, Colors.getAccentColor().withAlpha(alpha));
 
-        context.drawRightText(semibold6, hpText, baseHpX, hpY, Colors.getAccentColor().withAlpha(alpha));
-
-        if (this.goldenTextAnim.getRGB() > 0.01f) {
-            ScissorUtility.push(context.pose(), baseHpX, this.y, currentAbsWidth, this.height);
-            context.drawText(semibold6, absText, baseHpX, hpY, new ColorRGBA(255.0f, 220.0f, 81.0f, alpha * this.goldenTextAnim.getRGB()));
-            ScissorUtility.pop();
+        if (g > 0.01f) {
+            context.drawRightText(semibold6, absText, rightX, goldenHpY, new ColorRGBA(255.0f, 220.0f, 81.0f, alpha * g));
         }
 
         // Полоски здоровья
-        float barWidth = 65.0f + currentAbsWidth;
-        context.drawRoundedRect(this.x + 30.0f, this.y + this.height - 6.0f - contentYAnim, barWidth, 3.0f, BorderRadius.all(0.7f), Colors.getAdditionalColor().withAlpha(alpha * (1.0f - 0.7f * Interface.glass())));
-        context.drawRoundedRect(this.x + 30.0f, this.y + this.height - 6.0f - contentYAnim, barWidth * Math.clamp(this.health.getRGB(), 0.0f, 1.0f), 3.0f, BorderRadius.all(0.7f), Colors.getAccentColor().withAlpha(alpha));
+        float barWidth = 65.0f;
+        float barHeight = 3.0f - 0.5f * g;
+        float regBarY = this.y + this.height - 6.0f - contentYAnim - 2.0f * g;
 
-        float goldenBarWidth = barWidth * Math.clamp(this.golden.getRGB(), 0.0f, 1.0f);
-        context.drawRoundedRect(this.x + 30.0f + barWidth - goldenBarWidth, this.y + this.height - 6.0f - contentYAnim, goldenBarWidth, 3.0f, BorderRadius.all(0.7f), new ColorRGBA(255.0f, 220.0f, 81.0f, alpha));
+        context.drawRoundedRect(this.x + 30.0f, regBarY, barWidth, barHeight, BorderRadius.all(0.7f), Colors.getAdditionalColor().withAlpha(alpha * (1.0f - 0.7f * Interface.glass())));
+        context.drawRoundedRect(this.x + 30.0f, regBarY, barWidth * Math.clamp(this.health.getRGB(), 0.0f, 1.0f), barHeight, BorderRadius.all(0.7f), Colors.getAccentColor().withAlpha(alpha));
+
+        if (g > 0.01f) {
+            float goldBarY = regBarY + 5.0f * g;
+            float goldenBarWidth = barWidth * Math.clamp(this.golden.getRGB(), 0.0f, 1.0f);
+            context.drawRoundedRect(this.x + 30.0f, goldBarY, barWidth, barHeight, BorderRadius.all(0.7f), Colors.getAdditionalColor().withAlpha(alpha * g * (1.0f - 0.7f * Interface.glass())));
+            context.drawRoundedRect(this.x + 30.0f, goldBarY, goldenBarWidth, barHeight, BorderRadius.all(0.7f), new ColorRGBA(255.0f, 220.0f, 81.0f, alpha * g));
+        }
 
         ScissorUtility.pop();
     }
@@ -363,7 +360,8 @@ public class TargetHud extends HudElement {
 
     @Override
     public void onMouseClicked(double mouseX, double mouseY, MouseButton button) {
-        if (GuiUtility.isHovered((this.x + 30.0f), (this.y + 3.0f + 6.0f * this.content.getRGB()), 60.0, 6.0, mouseX, mouseY)) {
+        float g = this.goldenTextAnim.getRGB();
+        if (GuiUtility.isHovered((this.x + 30.0f), (this.y + 3.0f + 6.0f * this.content.getRGB() - 2.0f * g), 60.0, 6.0, mouseX, mouseY)) {
             if (this.target != null) {
                 TextUtility.copyText(this.target.getName().getString());
                 this.copyTimer.reset();

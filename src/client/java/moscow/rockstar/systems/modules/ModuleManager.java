@@ -19,6 +19,7 @@ import moscow.rockstar.systems.event.impl.window.MouseEvent;
 import moscow.rockstar.systems.modules.Module;
 import moscow.rockstar.systems.modules.exception.UnknownModuleException;
 import moscow.rockstar.systems.modules.impl.BaseModule;
+import moscow.rockstar.systems.modules.modules.combat.AimUtils;
 import moscow.rockstar.systems.modules.modules.movement.AutoSprint;
 import moscow.rockstar.systems.modules.modules.other.Assist;
 import moscow.rockstar.systems.modules.modules.other.Auction;
@@ -58,8 +59,10 @@ import moscow.rockstar.systems.modules.modules.visuals.TNTTimer;
 import moscow.rockstar.systems.modules.modules.visuals.TargetESP;
 import moscow.rockstar.systems.modules.modules.visuals.World;
 import moscow.rockstar.systems.modules.modules.visuals.Waypoints;
+import moscow.rockstar.systems.modules.modules.visuals.Beatifuly;
 import moscow.rockstar.systems.modules.modules.other.PartySystem;
 import moscow.rockstar.systems.modules.modules.other.ModerUtils;
+import moscow.rockstar.systems.modules.modules.other.Optimizer;
 import net.minecraft.client.Minecraft;
 import ru.kotopushka.compiler.sdk.annotations.CompileBytecode;
 
@@ -95,6 +98,7 @@ public class ModuleManager {
 
     @CompileBytecode
     public void registerModules() {
+        this.register(new AimUtils());
         this.register(new AutoSprint());
         this.register(new MenuModule());
         this.register(new Removals());
@@ -135,6 +139,8 @@ public class ModuleManager {
         this.register(new Waypoints());
         this.register(new PartySystem());
         this.register(new ModerUtils());
+        this.register(new Optimizer());
+        this.register(new Beatifuly());
     }
 
     @CompileBytecode

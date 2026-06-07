@@ -70,6 +70,31 @@ public class HandProvider implements SubmitNodeCollector, OrderedSubmitNodeColle
             r = (int) (originalR * 0.4f + (red * 255.0f) * 0.6f);
             g = (int) (originalG * 0.4f + (green * 255.0f) * 0.6f);
             b = (int) (originalB * 0.4f + (blue * 255.0f) * 0.6f);
+        } else if (customHand.isEffectFlare()) {
+            // Flare effect: pulsating warm fire color with a flicker.
+            // Pulse uses System.nanoTime so it animates without needing an extra tick wiring.
+            float t = (float) ((System.nanoTime() / 1_000_000L) % 100000L) / 1000.0f;
+            float pulse = 0.5f + 0.5f * (float) Math.sin(t * 6.2831853f * 1.3f);
+            float flicker = 0.85f + 0.15f * (float) Math.sin(t * 53.0f);
+            float intensity = pulse * flicker;
+
+            // Warm fire palette: bright orange-red core, yellow highlight
+            float fireR = 1.00f;
+            float fireG = 0.45f + 0.25f * intensity;
+            float fireB = 0.10f * intensity;
+
+            float mix = 0.55f + 0.30f * intensity;
+            float inv = 1.0f - mix;
+            r = (int) (originalR * inv + fireR * 255.0f * mix);
+            g = (int) (originalG * inv + fireG * 255.0f * mix);
+            b = (int) (originalB * inv + fireB * 255.0f * mix);
+        } else if (customHand.isEffectGlow()) {
+            // Glow effect: keep original texture mostly intact but add an additive accent-color glow
+            // so the hand reads as "lit from within / rim-glowing" with the accent color.
+            float boost = 0.55f;
+            r = (int) Math.min(255, originalR + (red * 255.0f) * boost);
+            g = (int) Math.min(255, originalG + (green * 255.0f) * boost);
+            b = (int) Math.min(255, originalB + (blue * 255.0f) * boost);
         } else {
             // Default: pure multiplication
             r = (int) (originalR * red);

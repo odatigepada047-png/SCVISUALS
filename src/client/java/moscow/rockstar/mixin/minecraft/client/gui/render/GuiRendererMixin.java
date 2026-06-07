@@ -18,13 +18,16 @@ public class GuiRendererMixin {
     private net.minecraft.client.gui.render.GuiItemAtlas itemAtlas;
 
     @org.spongepowered.asm.mixin.Unique
-    private static final java.util.Set<java.lang.Object> rockstar$accumulatedIdentities = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private final java.util.Set<java.lang.Object> rockstar$accumulatedIdentities = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
     @org.spongepowered.asm.mixin.Unique
-    private static final java.util.List<net.minecraft.client.renderer.item.TrackingItemStackRenderState> rockstar$cachedFallbackStates = new java.util.ArrayList<>();
+    private final java.util.List<net.minecraft.client.renderer.item.TrackingItemStackRenderState> rockstar$cachedFallbackStates = new java.util.ArrayList<>();
 
     @org.spongepowered.asm.mixin.Unique
-    private static boolean rockstar$fallbackInitialized = false;
+    private boolean rockstar$fallbackInitialized = false;
+
+    @org.spongepowered.asm.mixin.Unique
+    private net.minecraft.server.packs.resources.ResourceManager rockstar$lastResourceManager = null;
 
     @org.spongepowered.asm.mixin.Unique
     private final java.util.List<net.minecraft.client.renderer.item.TrackingItemStackRenderState> rockstar$tempFrameStates = new java.util.ArrayList<>();
@@ -46,6 +49,14 @@ public class GuiRendererMixin {
     private void rockstar$injectCustomItemIdentities(CallbackInfo ci) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+        
+        net.minecraft.server.packs.resources.ResourceManager resourceManager = mc.getResourceManager();
+        if (rockstar$lastResourceManager != resourceManager) {
+            rockstar$lastResourceManager = resourceManager;
+            rockstar$fallbackInitialized = false;
+            rockstar$accumulatedIdentities.clear();
+            rockstar$cachedFallbackStates.clear();
+        }
         
         java.util.Set<java.lang.Object> identities = ((moscow.rockstar.mixin.accessors.GuiRenderStateAccessor) this.renderState).rockstar$getItemModelIdentities();
         if (identities == null) return;
@@ -226,6 +237,21 @@ public class GuiRendererMixin {
             if (cooldownsHud != null) {
                 for (net.minecraft.world.item.Item item : cooldownsHud.getActiveCooldownItems()) {
                     rockstar$resolveDynamicItem(identities, new net.minecraft.world.item.ItemStack(item), mc.player);
+                }
+            }
+        } catch (Throwable t) {
+            // Ignore
+        }
+        
+        // 2e. Shulker Preview items
+        try {
+            moscow.rockstar.systems.modules.modules.visuals.ShulkerPreview shulkerPreview = 
+                moscow.rockstar.Rockstar.getInstance().getModuleManager().getModule(moscow.rockstar.systems.modules.modules.visuals.ShulkerPreview.class);
+            if (shulkerPreview != null && shulkerPreview.isEnabled()) {
+                for (net.minecraft.world.item.ItemStack item : shulkerPreview.getHoveredShulkerItems()) {
+                    if (item != null && !item.isEmpty()) {
+                        rockstar$resolveDynamicItem(identities, item, mc.player);
+                    }
                 }
             }
         } catch (Throwable t) {

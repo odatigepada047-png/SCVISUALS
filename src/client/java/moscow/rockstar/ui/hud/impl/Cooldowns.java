@@ -211,7 +211,6 @@ public class Cooldowns extends HudList {
             float iconX = this.x + 5.0f * entry.animation.getRGB() + (16.0f - itemSize) / 2.0f;
             float iconY = this.y + offset + off + (18.0f - itemSize) / 2.0f;
 
-            // Используем batch-рендеринг, он безопасен для других элементов интерфейса
             float prevAlpha = moscow.rockstar.utility.render.ShaderColorHelper.getAlpha();
             moscow.rockstar.utility.render.ShaderColorHelper.setShaderColor(1.0f, 1.0f, 1.0f, prevAlpha * entry.animation.getRGB());
             context.item(entry.item.getDefaultInstance(), iconX, iconY, scale);

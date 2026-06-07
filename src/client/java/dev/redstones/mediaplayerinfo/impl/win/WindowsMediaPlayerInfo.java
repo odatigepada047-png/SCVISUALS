@@ -19,26 +19,34 @@ implements MediaPlayerInfo {
     public native List<IMediaSession> getMediaSessions();
 
     static {
+        System.out.println("[MPI] static init: attempting to load MediaPlayerInfo.dll");
         boolean loaded = false;
         Throwable lastError = null;
         try {
             System.loadLibrary("MediaPlayerInfo");
+            System.out.println("[MPI] loadLibrary(MediaPlayerInfo) OK");
             loaded = true;
         }
         catch (Throwable throwable) {
+            System.out.println("[MPI] loadLibrary failed (expected if not on java.library.path): " + throwable);
             lastError = throwable;
         }
         if (!loaded) {
             try {
+                java.net.URL res = WindowsMediaPlayerInfo.class.getResource("/mediaplayerinfo/natives/win/MediaPlayerInfo.dll");
+                System.out.println("[MPI] resource URL=" + res);
                 Path tempDir = Files.createTempDirectory("mediaplayerinfo-", new FileAttribute[0]);
                 Path dllFile = tempDir.resolve("MediaPlayerInfo.dll");
                 try (InputStream inputStream = WindowsMediaPlayerInfo.class.getResourceAsStream("/mediaplayerinfo/natives/win/MediaPlayerInfo.dll");){
                     if (inputStream == null) {
                         throw new IOException("Resource not found: /mediaplayerinfo/natives/win/MediaPlayerInfo.dll");
                     }
-                    Files.write(dllFile, inputStream.readAllBytes(), new OpenOption[0]);
+                    byte[] bytes = inputStream.readAllBytes();
+                    System.out.println("[MPI] extracted " + bytes.length + " bytes -> " + dllFile);
+                    Files.write(dllFile, bytes, new OpenOption[0]);
                 }
                 System.load(dllFile.toAbsolutePath().toString());
+                System.out.println("[MPI] System.load OK from " + dllFile);
                 try {
                     Files.deleteIfExists(dllFile);
                     Files.deleteIfExists(tempDir);
@@ -50,6 +58,8 @@ implements MediaPlayerInfo {
                 loaded = true;
             }
             catch (Throwable throwable) {
+                System.err.println("[MPI] FATAL: extraction/load failed:");
+                throwable.printStackTrace();
                 if (lastError != null) {
                     throwable.addSuppressed(lastError);
                 }

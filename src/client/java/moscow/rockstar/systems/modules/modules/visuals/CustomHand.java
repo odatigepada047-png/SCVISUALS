@@ -30,6 +30,8 @@ public class CustomHand extends BaseModule {
     private final ModeSetting.Value effectOff = new ModeSetting.Value(this.effectMode, "modules.settings.custom_hand.effect_mode.none");
     private final ModeSetting.Value effectGlass = new ModeSetting.Value(this.effectMode, "modules.settings.custom_hand.effect_mode.glass");
     private final ModeSetting.Value effectBlur = new ModeSetting.Value(this.effectMode, "modules.settings.custom_hand.effect_mode.blur");
+    private final ModeSetting.Value effectFlare = new ModeSetting.Value(this.effectMode, "modules.settings.custom_hand.effect_mode.flare");
+    private final ModeSetting.Value effectGlow = new ModeSetting.Value(this.effectMode, "modules.settings.custom_hand.effect_mode.glow");
     private final SliderSetting effectAlpha = new SliderSetting(this, "modules.settings.custom_hand.effect_alpha").min(0.1f).max(1.0f).currentValue(0.65f).step(0.01f);
 
     private final EventListener<HandRenderEvent> onHandRender = event -> {
@@ -86,6 +88,14 @@ public class CustomHand extends BaseModule {
 
     public boolean isEffectBlur() {
         return this.effectBlur.isSelected();
+    }
+
+    public boolean isEffectFlare() {
+        return this.effectFlare.isSelected();
+    }
+
+    public boolean isEffectGlow() {
+        return this.effectGlow.isSelected();
     }
 
     public float getEffectAlpha() {

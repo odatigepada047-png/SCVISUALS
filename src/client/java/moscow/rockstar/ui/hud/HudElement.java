@@ -70,7 +70,7 @@ IMinecraft {
         if (!this.showing) {
             return;
         }
-        if (mc.level == null && !(this instanceof DynamicIsland)) {
+        if (mc.level == null && !(this instanceof DynamicIsland) && !(this instanceof moscow.rockstar.ui.hud.impl.TrapTimeHud)) {
             return;
         }
         this.update(context);

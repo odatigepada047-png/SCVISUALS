@@ -41,7 +41,31 @@ public class ElytraUtils
     private int currentTick = 0;
     private boolean isSwapping = false;
     private boolean keysReset = false;
+    private int chatSendDelay = -1;
+
+    private boolean isInventoryFull() {
+        if (ElytraUtils.mc.player == null) {
+            return false;
+        }
+        for (int i = 0; i < 36; i++) {
+            if (ElytraUtils.mc.player.getInventory().getItem(i).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private final EventListener<ClientPlayerTickEvent> onUpdate = event -> {
+        if (this.chatSendDelay > 0) {
+            this.chatSendDelay--;
+            if (this.chatSendDelay == 0) {
+                this.chatSendDelay = -1;
+                if (this.autoFlySpeed.isEnabled() && ElytraUtils.mc.player != null) {
+                    ElytraUtils.mc.player.connection.sendCommand("fly");
+                    ElytraUtils.mc.player.connection.sendCommand("speed 10");
+                }
+            }
+        }
 
         // Обработка свапа с задержкой
         if (this.isSwapping) {
@@ -54,6 +78,7 @@ public class ElytraUtils
                 ElytraUtils.mc.options.keyLeft.setDown(false);
                 ElytraUtils.mc.options.keyRight.setDown(false);
                 ElytraUtils.mc.options.keySprint.setDown(false);
+                ElytraUtils.mc.options.keyJump.setDown(false);
                 ElytraUtils.mc.player.setSprinting(false);
 
                 this.keysReset = true;
@@ -71,6 +96,7 @@ public class ElytraUtils
                     ElytraUtils.mc.options.keyDown.setDown(KeyUtility.isMappingPressed(ElytraUtils.mc.options.keyDown));
                     ElytraUtils.mc.options.keyLeft.setDown(KeyUtility.isMappingPressed(ElytraUtils.mc.options.keyLeft));
                     ElytraUtils.mc.options.keyRight.setDown(KeyUtility.isMappingPressed(ElytraUtils.mc.options.keyRight));
+                    ElytraUtils.mc.options.keyJump.setDown(KeyUtility.isMappingPressed(ElytraUtils.mc.options.keyJump));
 
                     boolean sprintPressed = KeyUtility.isMappingPressed(ElytraUtils.mc.options.keySprint);
                     ElytraUtils.mc.options.keySprint.setDown(sprintPressed);
@@ -114,14 +140,25 @@ public class ElytraUtils
         boolean isElytraEquipped = chestplateSlot.item() == Items.ELYTRA;
         boolean hasItemEquipped = !chestplateSlot.isEmpty();
 
+        if (this.isInventoryFull()) {
+            if (!isElytraEquipped && elytraItemSlot != null) {
+                InventoryUtility.moveItem(elytraItemSlot.getIdForServer(), chestplateSlot.getIdForServer(), hasItemEquipped);
+                if (this.autoFlySpeed.isEnabled()) {
+                    this.chatSendDelay = 2;
+                }
+            } else if (isElytraEquipped && chestplateItemSlot != null) {
+                InventoryUtility.moveItem(chestplateItemSlot.getIdForServer(), chestplateSlot.getIdForServer(), hasItemEquipped);
+            }
+            return;
+        }
+
         if (!isElytraEquipped && elytraItemSlot != null) {
             if (hasItemEquipped) {
                 InventoryUtility.quickMove(chestplateSlot.getIdForServer());
             }
             InventoryUtility.quickMove(elytraItemSlot.getIdForServer());
             if (this.autoFlySpeed.isEnabled()) {
-                ElytraUtils.mc.player.connection.sendChat("/fly");
-                ElytraUtils.mc.player.connection.sendChat("/speed 10");
+                this.chatSendDelay = 2;
             }
         } else if (isElytraEquipped && chestplateItemSlot != null) {
             InventoryUtility.quickMove(chestplateSlot.getIdForServer());

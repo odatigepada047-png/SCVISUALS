@@ -24,6 +24,20 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 public final class MeshDrawHelper implements IMinecraft {
+    public static final RenderPipeline GUI_LINES = net.minecraft.client.renderer.RenderPipelines.register(
+            RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.GUI_SNIPPET)
+                    .withLocation(moscow.rockstar.Rockstar.id("pipeline/gui_lines"))
+                    .withVertexFormat(com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR, com.mojang.blaze3d.vertex.VertexFormat.Mode.DEBUG_LINES)
+                    .build()
+    );
+
+    public static final RenderPipeline GUI_LINE_STRIP = net.minecraft.client.renderer.RenderPipelines.register(
+            RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.GUI_SNIPPET)
+                    .withLocation(moscow.rockstar.Rockstar.id("pipeline/gui_line_strip"))
+                    .withVertexFormat(com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR, com.mojang.blaze3d.vertex.VertexFormat.Mode.DEBUG_LINE_STRIP)
+                    .build()
+    );
+
     private static final int BUFFER_SIZE = 786432;
     private static final ByteBufferBuilder ALLOCATOR = new ByteBufferBuilder(BUFFER_SIZE);
     private static final Matrix4f TEXTURE_MATRIX = new Matrix4f();
@@ -95,6 +109,14 @@ public final class MeshDrawHelper implements IMinecraft {
                 draw(mesh, net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED);
             } else if (mesh != null && mesh.drawState().format() == com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH) {
                 draw(mesh, net.minecraft.client.renderer.RenderPipelines.LINES_TRANSLUCENT);
+            } else if (mesh != null && mesh.drawState().format() == com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR) {
+                if (mesh.drawState().mode() == com.mojang.blaze3d.vertex.VertexFormat.Mode.DEBUG_LINE_STRIP) {
+                    draw(mesh, GUI_LINE_STRIP);
+                } else if (mesh.drawState().mode() == com.mojang.blaze3d.vertex.VertexFormat.Mode.DEBUG_LINES) {
+                    draw(mesh, GUI_LINES);
+                } else {
+                    draw(mesh, net.minecraft.client.renderer.RenderPipelines.GUI);
+                }
             } else {
                 draw(mesh, net.minecraft.client.renderer.RenderPipelines.GUI);
             }

@@ -22,14 +22,26 @@ public interface MediaPlayerInfo {
 
         private static MediaPlayerInfo create() {
             String osName = System.getProperty("os.name", "").toLowerCase();
+            System.out.println("[MPI] os.name=" + osName + " arch=" + System.getProperty("os.arch"));
+            try {
+                java.net.URL src = WindowsMediaPlayerInfo.class.getProtectionDomain().getCodeSource().getLocation();
+                System.out.println("[MPI] WindowsMediaPlayerInfo loaded from: " + src);
+            } catch (Throwable t) {
+                System.out.println("[MPI] could not resolve source location: " + t);
+            }
             if (osName.contains("win")) {
                 try {
-                    return new WindowsMediaPlayerInfo();
+                    WindowsMediaPlayerInfo impl = new WindowsMediaPlayerInfo();
+                    System.out.println("[MPI] WindowsMediaPlayerInfo instantiated OK");
+                    return impl;
                 }
                 catch (Throwable throwable) {
+                    System.err.println("[MPI] FAILED to instantiate WindowsMediaPlayerInfo, falling back to Dummy:");
+                    throwable.printStackTrace();
                     return new DummyMediaPlayerInfo();
                 }
             }
+            System.out.println("[MPI] non-Windows OS, using Dummy");
             return new DummyMediaPlayerInfo();
         }
     }

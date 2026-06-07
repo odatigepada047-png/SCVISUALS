@@ -30,7 +30,7 @@ public class TrapTimeHud extends HudElement {
     private int seconds;
 
     public TrapTimeHud() {
-        super("hud.traptime", "icons/hud/player.png");
+        super("hud.traptime", "icons/hud/traptimer.png");
         this.showing = true;
         this.width = 120.0f;
         this.height = BAR_HEIGHT;
@@ -94,7 +94,10 @@ public class TrapTimeHud extends HudElement {
         float itemDrawSize = 16.0f * ICON_SCALE;
         float iconX = this.x + ICON_PADDING + (ICON_SIZE - itemDrawSize) / 2.0f;
         float iconY = this.y + ICON_PADDING + (ICON_SIZE - itemDrawSize) / 2.0f;
-        context.drawItem(new ItemStack(Items.NETHERITE_SCRAP), iconX, iconY, ICON_SCALE);
+        float prevAlpha = moscow.rockstar.utility.render.ShaderColorHelper.getAlpha();
+        moscow.rockstar.utility.render.ShaderColorHelper.setShaderColor(1.0f, 1.0f, 1.0f, prevAlpha * alpha);
+        context.item(Items.NETHERITE_SCRAP.getDefaultInstance(), iconX, iconY, ICON_SCALE);
+        moscow.rockstar.utility.render.ShaderColorHelper.setShaderColor(1.0f, 1.0f, 1.0f, prevAlpha);
 
         Font font = Fonts.MEDIUM.getFont(FONT_SIZE);
         float textX = this.x + TEXT_PAD_LEFT;

@@ -2,6 +2,7 @@ package moscow.rockstar.mixin.minecraft.client.gui.overlay;
 
 import moscow.rockstar.Rockstar;
 import moscow.rockstar.systems.modules.modules.player.Freelook;
+import moscow.rockstar.systems.modules.modules.visuals.Beatifuly;
 import moscow.rockstar.systems.modules.modules.visuals.Removals;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
@@ -15,6 +16,7 @@ import org.joml.Matrix4fc;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -25,6 +27,12 @@ public abstract class CameraMixin {
 
     private float rockstar$smoothedZoom = 4.0f;
     private boolean rockstar$freelookWasActive;
+
+    @Unique
+    private float rockstar$smoothedDistance = 0.0f;
+
+    @Shadow
+    private boolean detached;
 
     @Shadow
     private Entity entity;
@@ -125,6 +133,32 @@ public abstract class CameraMixin {
         if (removals.isEnabled() && (removals.getWater().isSelected() || removals.getWaterBlur().isSelected())
                 && ci.getReturnValue() == FogType.WATER) {
             ci.setReturnValue(FogType.NONE);
+        }
+    }
+
+    @Inject(method = "isDetached", at = @At("HEAD"), cancellable = true)
+    private void smoothF5$isDetached(CallbackInfoReturnable<Boolean> cir) {
+        if (Beatifuly.isSmoothF5Enabled() && this.rockstar$smoothedDistance > 0.05f) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "update", at = @At("TAIL"))
+    private void applySmoothF5(DeltaTracker tracker, CallbackInfo ci) {
+        if (Beatifuly.isSmoothF5Enabled()) {
+            float targetDist = this.detached ? this.getMaxZoom(4.0f) : 0.0f;
+            float speed = 0.15f;
+            if (Math.abs(this.rockstar$smoothedDistance - targetDist) > 0.001f) {
+                this.rockstar$smoothedDistance = Mth.lerp(speed, this.rockstar$smoothedDistance, targetDist);
+            } else {
+                this.rockstar$smoothedDistance = targetDist;
+            }
+            float adjustment = targetDist - this.rockstar$smoothedDistance;
+            if (Math.abs(adjustment) > 0.001f) {
+                this.move(-adjustment, 0.0f, 0.0f);
+            }
+        } else {
+            this.rockstar$smoothedDistance = this.detached ? this.getMaxZoom(4.0f) : 0.0f;
         }
     }
 }

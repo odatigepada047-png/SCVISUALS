@@ -26,6 +26,7 @@ import moscow.rockstar.utility.render.GuiDrawContextHolder;
 import moscow.rockstar.systems.event.impl.window.ContainerClickEvent;
 import moscow.rockstar.systems.event.impl.window.ContainerReleaseEvent;
 import moscow.rockstar.systems.modules.modules.player.InvUtils;
+import moscow.rockstar.systems.modules.modules.visuals.Beatifuly;
 import moscow.rockstar.utility.interfaces.IMinecraft;
 import moscow.rockstar.utility.time.Timer;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -50,11 +51,42 @@ implements IMinecraft {
     @Unique
     private final Timer timer = new Timer();
 
+    @Unique
+    private long rockstar$openTime = 0L;
+
     @Shadow
     protected abstract boolean isHovering(Slot var1, double var2, double var4);
 
     @Shadow
     protected abstract void slotClicked(Slot var1, int var2, int var3, ContainerInput var4);
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void onInit(CallbackInfo ci) {
+        this.rockstar$openTime = System.currentTimeMillis();
+    }
+
+    @Inject(method = "extractRenderState", at = @At("HEAD"))
+    private void onRenderHead(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (Beatifuly.isContainerAnimEnabled()) {
+            long elapsed = System.currentTimeMillis() - this.rockstar$openTime;
+            float t = Math.min(1.0f, elapsed / 250.0f);
+            float ease = t * (2.0f - t);
+            float scale = 0.8f + 0.2f * ease;
+            float centerX = (float) context.guiWidth() / 2.0f;
+            float centerY = (float) context.guiHeight() / 2.0f;
+            context.pose().pushMatrix();
+            context.pose().translate(centerX, centerY);
+            context.pose().scale(scale, scale);
+            context.pose().translate(-centerX, -centerY);
+        }
+    }
+
+    @Inject(method = "extractRenderState", at = @At("RETURN"))
+    private void onRenderReturn(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (Beatifuly.isContainerAnimEnabled()) {
+            context.pose().popMatrix();
+        }
+    }
 
     @Inject(method={"extractRenderState"}, at={@At(value="TAIL")})
     private void onRender(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {

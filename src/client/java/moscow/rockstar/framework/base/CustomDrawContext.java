@@ -285,7 +285,7 @@ public class CustomDrawContext
         try {
             var renderer = moscow.rockstar.utility.render.GuiDrawContextHolder.getGuiRenderer();
             var player = Minecraft.getInstance().player;
-            if (renderer != null && player != null) {
+            if (renderer != null) {
                 var atlas = ((moscow.rockstar.mixin.accessors.GuiRendererAccessor) renderer).rockstar$getItemAtlas();
                 if (atlas != null) {
                     var cleanStack = stack;
@@ -341,7 +341,11 @@ public class CustomDrawContext
     }
 
     private void renderItemFallback(ItemStack stack, float x, float y, float scale) {
-        // Safe fallback - do nothing to prevent next-frame queueing and hotbar flickering.
+        if (stack != null && stack.getItem() == net.minecraft.world.item.Items.NETHERITE_SCRAP) {
+            net.minecraft.resources.Identifier fallbackIcon = moscow.rockstar.Rockstar.id("icons/trap.png");
+            float size = 16.0f * scale;
+            this.drawTexture(fallbackIcon, x, y, size, size);
+        }
     }
 
     public void item(net.minecraft.world.item.Item item, float x, float y, float scale) {

@@ -285,6 +285,9 @@ modules.settings.prediction.entities.items=Przedmioty
 modules.settings.prediction.render_mode=Tryb
 modules.settings.prediction.render_mode.default=Zwykły
 modules.settings.prediction.render_mode.glow=Podświetlenie
+modules.settings.prediction.hitbox_style=Styl hitboxa
+modules.settings.prediction.hitbox_style.gradient=Gradient
+modules.settings.prediction.hitbox_style.outline=Obrys
 modules.settings.prediction.hand=W ręce
 modules.settings.prediction.walls=Przez ściany
 modules.settings.prediction.hud=Celujące w ciebie
@@ -695,7 +698,12 @@ modules.settings.tracers.targets.naked_players=gracze bez zbroi
 modules.settings.tracers.targets.friends=Przyjaciele
 
 # Ambience
-modules.settings.ambience.end_sky=zmienić niebo
+modules.settings.ambience.end_sky=Niebo Endu
+modules.settings.ambience.sky_mode=Tryb nieba
+modules.settings.ambience.sky_mode.default=Domyślny
+modules.settings.ambience.sky_mode.end=End
+modules.settings.ambience.sky_mode.galaxy=Galaktyka
+modules.settings.ambience.sky_mode.space=Kosmos
 modules.settings.ambience.custom_time=zmiana czasu
 modules.settings.ambience.time=czas
 modules.settings.ambience.bright=włączyć jasność
@@ -797,4 +805,35 @@ modules.settings.kill_effects.totem_sound.mode=Tryb dźwięku totemu
 modules.settings.kill_effects.totem_sound.mode.vebal=Vebal
 modules.settings.kill_effects.totem_sound.mode.lopez=Lopez
 modules.settings.kill_effects.totem_sound.mode.klyanus=Klyanus
+
+# Custom Hand
+modules.descriptions.custom_hand=Zaawansowana personalizacja ręki z pierwszej osoby
+modules.settings.custom_hand.open_menu=Otworz edytor
+modules.settings.custom_hand.main_group=Prawa reka
+modules.settings.custom_hand.off_group=Lewa reka
+modules.settings.custom_hand.effects_group=Efekty
+modules.settings.custom_hand.main_scale=Rozmiar
+modules.settings.custom_hand.main_offset_x=Prawo/Lewo
+modules.settings.custom_hand.main_offset_y=Gora/Dol
+modules.settings.custom_hand.main_offset_z=Blizej/Dalej
+modules.settings.custom_hand.off_scale=Rozmiar
+modules.settings.custom_hand.off_offset_x=Prawo/Lewo
+modules.settings.custom_hand.off_offset_y=Gora/Dol
+modules.settings.custom_hand.off_offset_z=Blizej/Dalej
+modules.settings.custom_hand.effect_mode=Efekt reki
+modules.settings.custom_hand.effect_mode.none=Wyl
+modules.settings.custom_hand.effect_mode.glass=Szklo
+modules.settings.custom_hand.effect_mode.blur=Rozmycie
+modules.settings.custom_hand.effect_mode.flare=Ogien
+modules.settings.custom_hand.effect_mode.glow=Poswiata
+modules.settings.custom_hand.effect_alpha=Przezroczystosc
+
+# Aim Utils
+modules.descriptions.aim_utils=Asystent celowania (Aim Assist)
+modules.settings.aim_utils.targets=Cele
+modules.settings.aim_utils.targets.players_armored=Gracze w zbroi
+modules.settings.aim_utils.targets.players_naked=Gracze bez zbroi
+modules.settings.aim_utils.targets.animals=Zwierzęta
+modules.settings.aim_utils.targets.mobs=Potwory
+modules.settings.aim_utils.targets.invisibles=Niewidzialni
 

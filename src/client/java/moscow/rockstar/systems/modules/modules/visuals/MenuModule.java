@@ -11,6 +11,7 @@ import moscow.rockstar.ui.menu.MenuScreen;
 import moscow.rockstar.ui.menu.api.MenuCloseListener;
 import moscow.rockstar.ui.menu.dropdown.DropDownScreen;
 import moscow.rockstar.ui.menu.modern.ModernScreen;
+import moscow.rockstar.ui.menu.neverlose.NeverloseScreen;
 import moscow.rockstar.ui.menu.test.TestScreen;
 import moscow.rockstar.utility.sounds.ClientSounds;
 import net.minecraft.client.gui.screens.Screen;
@@ -23,10 +24,12 @@ public class MenuModule extends BaseModule {
     private final ModeSetting.Value dropdown = new ModeSetting.Value(this.mode, "modules.settings.menu.mode.dropdown");
     private final ModeSetting.Value modern = new ModeSetting.Value(this.mode, "modules.settings.menu.mode.modern");
     private final ModeSetting.Value test = new ModeSetting.Value(this.mode, "modules.settings.menu.mode.test");
+    private final ModeSetting.Value neverlose = new ModeSetting.Value(this.mode, "modules.settings.menu.mode.neverlose");
 
     private ModernScreen modernScreen;
     private DropDownScreen dropDownScreen;
     private TestScreen testScreen;
+    private NeverloseScreen neverloseScreen;
 
     public ModernScreen getModernScreen() {
         if (this.modernScreen == null) {
@@ -49,12 +52,21 @@ public class MenuModule extends BaseModule {
         return this.testScreen;
     }
 
+    public NeverloseScreen getNeverloseScreen() {
+        if (this.neverloseScreen == null) {
+            this.neverloseScreen = new NeverloseScreen();
+        }
+        return this.neverloseScreen;
+    }
+
     @Override
     public void onEnable() {
         if (MenuModule.mc.screen instanceof MenuScreen) {
             return;
         }
-        if (this.test.isSelected()) {
+        if (this.neverlose.isSelected()) {
+            Rockstar.getInstance().setMenuScreen(this.getNeverloseScreen());
+        } else if (this.test.isSelected()) {
             Rockstar.getInstance().setMenuScreen(this.getTestScreen());
         } else if (this.modern.isSelected()) {
             Rockstar.getInstance().setMenuScreen(this.getModernScreen());
@@ -80,6 +92,7 @@ public class MenuModule extends BaseModule {
         this.modernScreen = null;
         this.dropDownScreen = null;
         this.testScreen = null;
+        this.neverloseScreen = null;
         super.onDisable();
     }
 

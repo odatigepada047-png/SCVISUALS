@@ -81,6 +81,7 @@ public class AutoSwap extends BaseModule {
                 AutoSwap.mc.options.keyLeft.setDown(false);
                 AutoSwap.mc.options.keyRight.setDown(false);
                 AutoSwap.mc.options.keySprint.setDown(false);
+                AutoSwap.mc.options.keyJump.setDown(false);
                 AutoSwap.mc.player.setSprinting(false);
 
                 this.keysReset = true;
@@ -94,6 +95,7 @@ public class AutoSwap extends BaseModule {
                     AutoSwap.mc.options.keyDown.setDown(KeyUtility.isMappingPressed(AutoSwap.mc.options.keyDown));
                     AutoSwap.mc.options.keyLeft.setDown(KeyUtility.isMappingPressed(AutoSwap.mc.options.keyLeft));
                     AutoSwap.mc.options.keyRight.setDown(KeyUtility.isMappingPressed(AutoSwap.mc.options.keyRight));
+                    AutoSwap.mc.options.keyJump.setDown(KeyUtility.isMappingPressed(AutoSwap.mc.options.keyJump));
 
                     boolean sprintPressed = KeyUtility.isMappingPressed(AutoSwap.mc.options.keySprint);
                     AutoSwap.mc.options.keySprint.setDown(sprintPressed);

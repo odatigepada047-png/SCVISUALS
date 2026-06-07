@@ -14,6 +14,7 @@ extends Event {
     private final float x;
     private final float y;
     private final int button;
+    private final boolean doubled;
 
     @Generated
     public float getX() {
@@ -31,10 +32,17 @@ extends Event {
     }
 
     @Generated
-    public ChatClickEvent(float x, float y, int button) {
+    public boolean isDoubled() {
+        return this.doubled;
+    }
+
+    @Generated
+    public ChatClickEvent(float x, float y, int button, boolean doubled) {
         this.x = x;
         this.y = y;
         this.button = button;
+        this.doubled = doubled;
     }
 }
+
 

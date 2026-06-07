@@ -291,6 +291,9 @@ modules.settings.prediction.entities.items=Предметы
 modules.settings.prediction.render_mode=Режим
 modules.settings.prediction.render_mode.default=Обычный
 modules.settings.prediction.render_mode.glow=Свечение
+modules.settings.prediction.hitbox_style=Стиль хитбокса
+modules.settings.prediction.hitbox_style.gradient=Градиент
+modules.settings.prediction.hitbox_style.outline=Обводка
 modules.settings.prediction.hand=В руке
 modules.settings.prediction.walls=Через стены
 modules.settings.prediction.hud=Попадания в вас
@@ -764,6 +767,7 @@ modules.settings.tracers.targets.naked_players=Игроки без брони
 modules.settings.tracers.targets.friends=Друзья
 
 # Ambience
+modules.settings.ambience.end_sky=Небо Энда
 modules.settings.ambience.sky_mode=Режим Неба
 modules.settings.ambience.sky_mode.default=Стандартный
 modules.settings.ambience.sky_mode.end=Энд
@@ -863,22 +867,14 @@ modules.settings.removals.waterBlur=���� ����
 modules.settings.removals.lavaFog=������� �����
 
 # Custom Crosshair
-modules.descriptions.custom_crosshair=��������� ������
-modules.settings.custom_crosshair.open_editor=������� ��������
-modules.settings.custom_crosshair.type=���
-modules.settings.custom_crosshair.type.static=�����������
-modules.settings.custom_crosshair.type.dynamic=������������
-modules.settings.custom_crosshair.color=����
-modules.settings.custom_crosshair.red_on_target=������� �� ����
-modules.settings.custom_crosshair.target_color=���� �� ����
-modules.descriptions.custom_crosshair= 
-modules.settings.custom_crosshair.open_editor= 
-modules.settings.custom_crosshair.type=
-modules.settings.custom_crosshair.type.static=
-modules.settings.custom_crosshair.type.dynamic=
-modules.settings.custom_crosshair.color=
-modules.settings.custom_crosshair.red_on_target=  
-modules.settings.custom_crosshair.target_color=  
+modules.descriptions.custom_crosshair=Кастомный прицел
+modules.settings.custom_crosshair.open_editor=Открыть редактор
+modules.settings.custom_crosshair.type=Тип
+modules.settings.custom_crosshair.type.static=Статичный
+modules.settings.custom_crosshair.type.dynamic=Динамичный
+modules.settings.custom_crosshair.color=Цвет
+modules.settings.custom_crosshair.red_on_target=Красный на цели
+modules.settings.custom_crosshair.target_color=Цвет на цели
 
 # Shulker Preview
 modules.descriptions.shulker_preview=  
@@ -909,25 +905,18 @@ modules.settings.custom_hand.effect_mode=Эффект руки
 modules.settings.custom_hand.effect_mode.none=Выкл
 modules.settings.custom_hand.effect_mode.glass=Стекло
 modules.settings.custom_hand.effect_mode.blur=Блюр
+modules.settings.custom_hand.effect_mode.flare=Огонь
+modules.settings.custom_hand.effect_mode.glow=Свечение
 modules.settings.custom_hand.effect_alpha=Прозрачность
 
 hud.targethud.ignore_friends=Игнорировать друзей
 modules.settings.target_esp.ignore_friends=Игнорировать друзей
-modules.descriptions.custom_hand=Продвинутая настройка руки от первого лица
-modules.settings.custom_hand.open_menu=Открыть редактор
-modules.settings.custom_hand.main_group=Правая рука
-modules.settings.custom_hand.off_group=Левая рука
-modules.settings.custom_hand.effects_group=Эффекты
-modules.settings.custom_hand.main_scale=Размер
-modules.settings.custom_hand.main_offset_x=Вправо/Влево
-modules.settings.custom_hand.main_offset_y=Вверх/Вниз
-modules.settings.custom_hand.main_offset_z=Ближе/Дальше
-modules.settings.custom_hand.off_scale=Размер
-modules.settings.custom_hand.off_offset_x=Вправо/Влево
-modules.settings.custom_hand.off_offset_y=Вверх/Вниз
-modules.settings.custom_hand.off_offset_z=Ближе/Дальше
-modules.settings.custom_hand.effect_mode=Эффект руки
-modules.settings.custom_hand.effect_mode.none=Выкл
-modules.settings.custom_hand.effect_mode.glass=Стекло
-modules.settings.custom_hand.effect_mode.blur=Блюр
-modules.settings.custom_hand.effect_alpha=Прозрачность
+
+# Aim Utils
+modules.descriptions.aim_utils=Помощник прицеливания (Aim Assist)
+modules.settings.aim_utils.targets=Цели
+modules.settings.aim_utils.targets.players_armored=Игроки в броне
+modules.settings.aim_utils.targets.players_naked=Игроки без брони
+modules.settings.aim_utils.targets.animals=Животные
+modules.settings.aim_utils.targets.mobs=Мобы
+modules.settings.aim_utils.targets.invisibles=Невидимки

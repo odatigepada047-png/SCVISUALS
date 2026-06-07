@@ -31,6 +31,8 @@ import moscow.rockstar.utility.render.RenderUtility;
 import moscow.rockstar.utility.render.obj.Rect;
 import moscow.rockstar.utility.sounds.MusicTracker;
 import moscow.rockstar.utility.sounds.MediaSeeker;
+import moscow.rockstar.utility.sounds.TimedLyric;
+import java.util.List;
 import moscow.rockstar.utility.time.Timer;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
@@ -50,12 +52,19 @@ implements IMinecraft {
     private final Timer seekTimer = new Timer();
     private boolean showLyrics = false;
     private int lyricsOffset = 0;
+    private final Animation syncedScroll = new Animation(450L, 0.0f, Easing.FIGMA_EASE_IN_OUT);
+    private final Animation syncedHighlight = new Animation(350L, 0.0f, Easing.FIGMA_EASE_IN_OUT);
+    private int lastSyncedIndex = -1;
     private final EventListener<MouseScrollEvent> onMouseScroll = event -> {
         if (!this.showLyrics) {
             return;
         }
         DynamicIsland island = Rockstar.getInstance().getHud().getIsland();
         if (island.active() != this || !island.isExtended()) {
+            return;
+        }
+        MusicTracker tracker = Rockstar.getInstance().getMusicTracker();
+        if (tracker.getSyncedLyrics() != null && !tracker.getSyncedLyrics().isEmpty()) {
             return;
         }
         if (event.getVerticalAmount() < 0.0) {
@@ -65,7 +74,7 @@ implements IMinecraft {
         } else {
             return;
         }
-        String[] lines = Rockstar.getInstance().getMusicTracker().getLyrics().split("\\n");
+        String[] lines = tracker.getLyrics().split("\\n");
         int maxOffset = Math.max(0, lines.length - 6);
         this.lyricsOffset = Math.min(Math.max(0, this.lyricsOffset), maxOffset);
     };
@@ -250,18 +259,23 @@ implements IMinecraft {
                     context.drawTexture(Rockstar.id("icons/music/repeat1.png"), x + 14.0f, y + expHeight - 21.0f, 8.0f, 8.0f, textColor);
                 }
             }
-            if (tracker.getLyrics().isEmpty()) {
+            List<TimedLyric> synced = tracker.getSyncedLyrics();
+            boolean hasSynced = synced != null && !synced.isEmpty();
+            boolean hasPlain = !tracker.getLyrics().isEmpty() && tracker.getLyrics().split("butors\\n\\n").length > 1;
+            if (!hasSynced && !hasPlain) {
                 this.showLyrics = false;
             }
             Rect lyricsRect = new Rect(x + 14.0f, y + expHeight - 21.0f, 8.0f, 8.0f);
-            if (!tracker.getLyrics().isEmpty() && tracker.getLyrics().split("butors\\n\\n").length > 1) {
+            if (hasSynced || hasPlain) {
                 if (lyricsRect.hovered(GuiUtility.getMouse().x, GuiUtility.getMouse().y)) {
                     CursorUtility.set(CursorType.HAND);
                 }
                 this.hoverLyrics.update(lyricsRect.hovered(GuiUtility.getMouse().x, GuiUtility.getMouse().y));
                 context.drawTexture(Rockstar.id("icons/music/text.png"), lyricsRect, textColor.withAlpha(255.0f - 100.0f * this.hoverLyrics.getRGB()));
             }
-            if (this.showLyrics && tracker.getLyrics().split("butors\\n\\n").length > 1) {
+            if (this.showLyrics && hasSynced) {
+                this.drawSyncedLyrics(context, synced, media.getPosition() * 1000L, x, y, expWidth, expHeight, extending, textColor);
+            } else if (this.showLyrics && hasPlain) {
                 int maxLines;
                 String[] lines = tracker.getLyrics().split("butors\\n\\n")[1].split("\\n");
                 if (this.lyricsOffset > lines.length - (maxLines = Math.min(6, lines.length))) {
@@ -326,7 +340,9 @@ implements IMinecraft {
             clickHandled = true;
         }
         Rect lyricsRect = new Rect(x + 14.0f, y + height - 21.0f, 8.0f, 8.0f);
-        if (!tracker.getLyrics().isEmpty() && GuiUtility.isHovered((double)lyricsRect.getX(), (double)lyricsRect.getY(), (double)lyricsRect.getWidth(), (double)lyricsRect.getHeight(), mouseX, mouseY) && tracker.getLyrics().split("butors\\n\\n").length > 1) {
+        boolean hasSyncedClick = tracker.getSyncedLyrics() != null && !tracker.getSyncedLyrics().isEmpty();
+        boolean hasPlainClick = !tracker.getLyrics().isEmpty() && tracker.getLyrics().split("butors\\n\\n").length > 1;
+        if ((hasSyncedClick || hasPlainClick) && GuiUtility.isHovered((double)lyricsRect.getX(), (double)lyricsRect.getY(), (double)lyricsRect.getWidth(), (double)lyricsRect.getHeight(), mouseX, mouseY)) {
             boolean bl = this.showLyrics = !this.showLyrics;
             if (this.showLyrics) {
                 this.lyricsOffset = 0;
@@ -340,6 +356,63 @@ implements IMinecraft {
     @Override
     public boolean canShow() {
         return Rockstar.getInstance().getMusicTracker().getSession() != null && Rockstar.getInstance().getMusicTracker().haveActiveSession() && !Rockstar.getInstance().getMusicTracker().getSession().getOwner().toLowerCase().contains("gram");
+    }
+
+    private void drawSyncedLyrics(CustomDrawContext context, List<TimedLyric> lines, long positionMs,
+                                  float x, float y, float expWidth, float expHeight, float extending, ColorRGBA textColor) {
+        int currentIdx = -1;
+        for (int i = 0; i < lines.size(); ++i) {
+            if (lines.get(i).getTimeMs() <= positionMs) currentIdx = i;
+            else break;
+        }
+        if (currentIdx != this.lastSyncedIndex) {
+            this.syncedHighlight.reset(0.0f);
+            this.lastSyncedIndex = currentIdx;
+        }
+        this.syncedHighlight.update(1.0f);
+        float target = Math.max(0, currentIdx);
+        this.syncedScroll.update(target);
+        float scroll = this.syncedScroll.getValue();
+
+        float areaTop = y + 53.0f;
+        float areaBottom = y + expHeight - 23.0f;
+        float areaHeight = areaBottom - areaTop;
+        float centerY = areaTop + areaHeight / 2.0f;
+        float lineHeight = 8.0f;
+        float textX = x + 10.0f;
+        float maxTextWidth = expWidth - 20.0f;
+
+        for (int i = 0; i < lines.size(); ++i) {
+            String text = lines.get(i).getText();
+            if (text.isEmpty()) continue;
+            float lineY = centerY + (i - scroll) * lineHeight - 3.0f;
+            if (lineY < areaTop - lineHeight || lineY > areaBottom) continue;
+            int distance = Math.abs(i - currentIdx);
+            float baseAlpha;
+            float fontSize;
+            if (i == currentIdx) {
+                float t = this.syncedHighlight.getRGB();
+                baseAlpha = 200.0f + 55.0f * t;
+                fontSize = 6.5f;
+            } else if (distance == 1) {
+                baseAlpha = 110.0f;
+                fontSize = 6.0f;
+            } else {
+                baseAlpha = 60.0f;
+                fontSize = 6.0f;
+            }
+            float edgeFade = 1.0f;
+            float fadeMargin = lineHeight * 1.5f;
+            if (lineY < areaTop + fadeMargin) {
+                edgeFade = Math.max(0.0f, (lineY - areaTop) / fadeMargin);
+            } else if (lineY > areaBottom - fadeMargin) {
+                edgeFade = Math.max(0.0f, (areaBottom - lineY) / fadeMargin);
+            }
+            float alpha = baseAlpha * extending * edgeFade;
+            if (alpha <= 1.0f) continue;
+            context.drawFadeoutText(Fonts.REGULAR.getFont(fontSize), text, textX, lineY,
+                    textColor.withAlpha(alpha), 0.91f, 1.0f, maxTextWidth);
+        }
     }
 
     public static String formatTime(long totalSeconds) {

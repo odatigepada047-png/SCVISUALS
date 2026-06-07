@@ -66,6 +66,7 @@
     "minecraft.render.entity.EntityRenderStateMixin",
     "minecraft.render.item.HeldItemRendererMixin",
     "minecraft.world.ClientWorldMixin",
+    "minecraft.world.AbstractBlockStateMixin",
     "minecraft.world.chunk.ClientChunkManagerMixin",
     "minecraft.entity.ItemCooldownManagerMixin",
     "minecraft.entity.ItemCooldownsAccessor",
